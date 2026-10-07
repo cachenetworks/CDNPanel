@@ -8,8 +8,8 @@ coverage/
 .env.*
 !.env.example
 data/
-storage/
-backups/
+/storage/
+/backups/
 *.log
 .DS_Store
 next-env.d.ts
