@@ -1,246 +1,949 @@
-# CDN Platform
+# CDNPanel
 
-A self-hosted CDN and file delivery platform: secure uploads, public/private files, signed URLs, API keys with scopes, staff dashboard with RBAC, analytics, audit logs, webhooks and interactive API documentation.
+> A security-focused, self-hosted CDN and file-delivery platform built for people who want control of their storage, delivery, API access, staff permissions, analytics, and infrastructure.
 
-- **API** — Fastify + TypeScript, PostgreSQL (Prisma), Redis (rate limits, BullMQ jobs)
-- **Worker** — malware scanning (ClamAV), media metadata, webhooks, cleanup, analytics roll-ups, retention
-- **Dashboard** — Next.js 15, React 19, Tailwind
-- **Storage** — local filesystem or any S3-compatible service (AWS S3, Cloudflare R2, MinIO, Backblaze B2)
-- **Edge** — Nginx (X-Accel-Redirect file serving), Cloudflare-aware
+[![Build & publish images](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml/badge.svg)](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml)
+![Node.js](https://img.shields.io/badge/Node.js-22.9%2B-339933?logo=node.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-6.2%2B-DC382D?logo=redis&logoColor=white)
+![License](https://img.shields.io/badge/license-Source--Available-orange)
 
-## Contents
+**CDNPanel** combines a staff dashboard, REST API, secure upload pipeline, storage abstraction, file delivery layer, analytics, audit logging, background workers, and production deployment tooling in one project.
 
-1. [Features](#features) · 2. [Architecture](#architecture) · 3. [Requirements](#requirements) · 4. [Installation](#installation) · 5. [Docker deployment](#docker-deployment) · 6. [Environment](#environment-configuration) · 7. [Storage](#storage-configuration) · 8. [Cloudflare](#cloudflare-configuration) · 9. [Nginx](#nginx-configuration) · 10. [Security model](#security-model) · 11. [API authentication](#api-authentication) · 12. [API documentation](#api-documentation) · 13. [Backups](#backups) · 14. [Updating](#updating) · 15. [Troubleshooting](#troubleshooting) · 16. [Development](#development) · 17. [License](#license)
+It supports local storage and S3-compatible backends including **AWS S3, Cloudflare R2, MinIO, and Backblaze B2**, and is designed to sit behind **Nginx and/or Cloudflare**.
 
-## Features
+> [!IMPORTANT]
+> CDNPanel is **source-available, not open source**. Personal non-commercial use and community contribution forks are allowed. Redistribution, rebranding, commercial use, organisational deployment, independent releases, and hosted resale are restricted. Read the [LICENSE](LICENSE) before using or forking the project.
 
-- **Files** — grid/list explorer, nested folders, breadcrumbs, search (name, id, SHA-256, MIME, folder, uploader) and filters (date, type, size, visibility, uploader), bulk select/move/delete, preview, rename/move/copy, copy CDN/API URLs, per-file metadata (type, size, checksum, dimensions, duration, storage, downloads, bandwidth).
-- **Uploads** — drag & drop, multiple concurrent uploads with progress/speed/retry; resumable chunked uploads for large files; content-type detection from file signatures; SHA-256 integrity; deduplication; size limits, allowed MIME types, blocked extensions, quotas.
-- **Visibility** — `PUBLIC`, `PRIVATE`, `AUTHENTICATED`, `SIGNED_URL_ONLY`, with folder inheritance. Expiring HMAC-signed URLs.
-- **Delivery** — `GET`/`HEAD /files/{id}` and `/p/{folder}/{file}` with `Range`, `ETag`, `Last-Modified`, conditional requests, per-file `Cache-Control`, forced `Content-Disposition: attachment` + sandbox CSP for HTML/SVG/XML/JS/PDF.
-- **API keys** — `cdn_live_…`/`cdn_test_…`, shown once, stored as HMAC-SHA256 hashes; scopes, expiry, per-key rate limits, IP/CIDR allowlists, endpoint allowlists, disable/rotate (with grace period)/revoke/revoke-all.
-- **Staff auth** — Argon2id passwords, HttpOnly session cookies, remember-me, per-session and all-device logout, TOTP 2FA with recovery codes, brute-force throttling and lockout, step-up re-authentication for dangerous actions, invitations and reset links.
-- **RBAC** — 23 granular permissions, 7 built-in roles (Founder, Administrator, Developer, Moderator, Support, Uploader, Viewer), custom roles, privilege-escalation guards, folder role restrictions.
-- **Analytics** — requests, bandwidth, downloads, cache revalidations, response times, errors; breakdowns by file, folder, API key, MIME type, country and status code; 24h/7d/30d/90d/custom ranges; daily roll-ups beyond the raw retention window.
-- **Audit & security** — append-only audit log (enforced by a database trigger), security events, security center (failed logins, suspicious IPs/keys, expired/revoked keys, active sessions, login IPs), session revocation.
-- **Webhooks** — HMAC-SHA256 signed events with retries and delivery history.
-- **Docs** — OpenAPI 3.1 at `/openapi.json` and an interactive reference at `/dashboard/docs` with curl/JavaScript/Node.js/Python samples and “Try it”.
+---
+
+## Why CDNPanel?
+
+A normal file uploader is easy to build. A trustworthy file-delivery platform is not.
+
+CDNPanel is designed around the parts that become difficult once a project starts handling real users, API clients, staff access, multiple storage providers, large uploads, and security-sensitive data:
+
+- secure staff authentication and session management;
+- granular role-based access control;
+- scoped and revocable API keys;
+- resumable uploads with integrity checks;
+- public, private, authenticated, and signed-only delivery;
+- storage-provider abstraction;
+- malware scanning and quarantine;
+- audit logging and security events;
+- analytics and bandwidth tracking;
+- webhook delivery and retries;
+- production Docker deployments;
+- Cloudflare-aware reverse-proxy handling;
+- generated OpenAPI documentation;
+- backup, retention, and operational tooling.
+
+CDNPanel is intended to be understandable enough to self-host while still having the structure expected from a serious production service.
+
+---
+
+## Table of contents
+
+- [Feature overview](#feature-overview)
+- [Architecture](#architecture)
+- [Technology stack](#technology-stack)
+- [Quick start](#quick-start)
+- [Docker and Dockge deployment](#docker-and-dockge-deployment)
+- [Storage](#storage)
+- [File delivery](#file-delivery)
+- [Authentication and RBAC](#authentication-and-rbac)
+- [API keys](#api-keys)
+- [Security model](#security-model)
+- [Analytics and audit logs](#analytics-and-audit-logs)
+- [Webhooks](#webhooks)
+- [API documentation](#api-documentation)
+- [Cloudflare](#cloudflare)
+- [Health and operations](#health-and-operations)
+- [Backups](#backups)
+- [Development](#development)
+- [Testing](#testing)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Feature overview
+
+### File management
+
+- grid and list file explorer;
+- nested folders and breadcrumbs;
+- search by name, ID, SHA-256, MIME type, folder, or uploader;
+- filtering by date, type, size, visibility, and uploader;
+- rename, move, copy, preview, download, and delete;
+- bulk selection and bulk actions;
+- friendly folder/file paths;
+- copyable CDN and API URLs;
+- file metadata including:
+  - MIME type;
+  - extension;
+  - size;
+  - SHA-256;
+  - image dimensions;
+  - media duration;
+  - storage provider;
+  - download count;
+  - bandwidth usage;
+  - last access time.
+
+### Upload pipeline
+
+- drag-and-drop uploads;
+- multiple concurrent uploads;
+- progress and transfer-speed reporting;
+- retry support;
+- resumable chunked uploads for large files;
+- signature-based content-type detection;
+- SHA-256 verification;
+- duplicate detection;
+- file-size limits;
+- allowed MIME-type rules;
+- blocked extension rules;
+- storage quotas;
+- optional ClamAV malware scanning;
+- quarantine before delivery when scanning is required.
+
+### Visibility and delivery
+
+Files support:
+
+- `PUBLIC`;
+- `PRIVATE`;
+- `AUTHENTICATED`;
+- `SIGNED_URL_ONLY`.
+
+Folder defaults can influence file visibility, while signed URLs provide expiring HMAC-authorised access.
+
+Delivery supports:
+
+- `GET` and `HEAD`;
+- HTTP Range requests;
+- `ETag`;
+- `Last-Modified`;
+- conditional requests and `304 Not Modified`;
+- per-file `Cache-Control`;
+- safe handling of active content;
+- Nginx `X-Accel-Redirect`;
+- S3 presigned redirects;
+- direct application streaming.
+
+### Staff authentication
+
+- Argon2id password hashing;
+- HttpOnly session cookies;
+- optional "keep me signed in";
+- per-session logout;
+- logout from all devices;
+- TOTP two-factor authentication;
+- recovery codes;
+- staff invitations;
+- password reset tokens;
+- brute-force throttling;
+- temporary account lockout;
+- step-up re-authentication for sensitive actions.
+
+### RBAC
+
+CDNPanel ships with granular permissions and built-in roles including:
+
+- Founder;
+- Administrator;
+- Developer;
+- Moderator;
+- Support;
+- Uploader;
+- Viewer.
+
+Custom roles are supported, along with privilege-escalation protections and folder-level staff restrictions.
+
+### API keys
+
+API keys use `cdn_live_...` and `cdn_test_...` prefixes and support:
+
+- one-time secret display;
+- HMAC-SHA256 storage rather than raw-key storage;
+- scopes;
+- expiration;
+- per-key request limits;
+- IP and CIDR restrictions;
+- endpoint allowlists;
+- disable/enable;
+- rotation with a grace period;
+- revocation;
+- revoke-all workflows;
+- last-used metadata;
+- usage analytics.
+
+### Analytics
+
+CDNPanel can track:
+
+- requests;
+- downloads;
+- bandwidth;
+- upload activity;
+- response time;
+- errors;
+- cache status;
+- status codes;
+- MIME types;
+- files;
+- folders;
+- API keys;
+- countries.
+
+The dashboard supports common time windows and custom ranges. Raw request data can be retained for a limited period while daily roll-ups preserve longer-term analytics.
+
+### Audit and security events
+
+The platform includes:
+
+- append-only audit logs;
+- database-level protection against normal audit-row mutation;
+- failed-login tracking;
+- invalid-key events;
+- suspicious API-key activity;
+- CSRF failures;
+- signed-URL failures;
+- rate-limit events;
+- session visibility;
+- session revocation;
+- security-event retention.
+
+### Webhooks
+
+Webhook support includes:
+
+- event subscriptions;
+- HMAC-SHA256 signing;
+- delivery history;
+- retries;
+- response-code recording;
+- failure details;
+- delayed retry scheduling;
+- SSRF-aware destination validation.
+
+### API documentation
+
+The API definition is generated from the same route declarations used by the application.
+
+That gives CDNPanel:
+
+- OpenAPI 3.1;
+- `/openapi.json`;
+- interactive docs under `/dashboard/docs`;
+- endpoint search;
+- parameter documentation;
+- permissions and scopes;
+- example requests;
+- "Try it" support;
+- examples for curl, JavaScript, Node.js, and Python.
+
+---
 
 ## Architecture
 
-```
-                 Cloudflare (TLS, WAF)
-                        │  tunnel / proxied
-                        ▼
-                ┌───────────────┐   /, /login, /dashboard/*   ┌──────────┐
-   :8873 ──────▶│     Nginx     │────────────────────────────▶│   web    │ Next.js dashboard
-                │               │   /api/*, /files/*, /p/*,   ├──────────┤
-                │ X-Accel files │──────/openapi.json─────────▶│   api    │ Fastify (REST + delivery)
-                └──────┬────────┘                             └────┬─────┘
-                       │ internal /_protected_storage/              │ BullMQ
-                       ▼                                            ▼
-                 cdn-data volume ◀──────────────────────────── ┌──────────┐
-                 (local storage)                               │  worker  │ scan · metadata · webhooks · cleanup · roll-ups
-                                                               └────┬─────┘
-                                     PostgreSQL ◀──────────────────┤
-                                     Redis      ◀──────────────────┘
+```text
+                             Internet
+                                │
+                                ▼
+                    ┌─────────────────────┐
+                    │ Cloudflare / TLS    │
+                    │ WAF / Tunnel / DNS  │
+                    └──────────┬──────────┘
+                               │
+                               ▼
+                    ┌─────────────────────┐
+                    │        Nginx        │
+                    │ reverse proxy       │
+                    │ X-Accel delivery    │
+                    └──────┬───────┬──────┘
+                           │       │
+              dashboard    │       │ API / delivery
+                           ▼       ▼
+                  ┌────────────┐  ┌────────────┐
+                  │ Next.js Web│  │ Fastify API│
+                  └────────────┘  └──────┬─────┘
+                                         │
+                                  BullMQ │ jobs
+                                         ▼
+                                  ┌────────────┐
+                                  │   Worker   │
+                                  │ scan       │
+                                  │ metadata   │
+                                  │ webhooks   │
+                                  │ cleanup    │
+                                  │ roll-ups   │
+                                  └─────┬──────┘
+                                        │
+             ┌──────────────────────────┼──────────────────────────┐
+             ▼                          ▼                          ▼
+       PostgreSQL                    Redis                Storage providers
+                                                       local / S3 / R2 /
+                                                       MinIO / Backblaze B2
 ```
 
-```
+### Repository layout
+
+```text
 apps/
-  api/        Fastify API, CDN delivery, background worker (src/worker), CLI scripts
-  web/        Next.js staff dashboard
+  api/              Fastify REST API, file delivery, worker, CLI scripts
+  web/              Next.js staff dashboard
+
 packages/
-  shared/     Errors, ids, RBAC catalogue, crypto (AES-256-GCM, API keys, signed URLs, webhooks), filename rules
-  storage/    Storage driver abstraction: local + S3-compatible
-  database/   Prisma schema, migrations, seed
+  shared/           errors, IDs, RBAC, crypto, signed URLs, validation
+  storage/          local + S3-compatible storage abstraction
+  database/         Prisma schema, migrations, seeds
+
 infrastructure/
-  docker/     Dockerfiles      nginx/   Nginx configuration
-docs/         Backups
-scripts/      backup-postgres.sh
+  docker/           production Dockerfiles
+  nginx/            Nginx configuration
+
+deploy/
+  dockge/           prebuilt-image Dockge stack
+
+docs/
+  backups.md
+
+scripts/
+  backup-postgres.sh
 ```
 
-Every REST route is declared once (`apps/api/src/http/route.ts`): the same definition drives validation, auth mode, permission/scope enforcement, CSRF, step-up auth, per-route rate limits and the OpenAPI document. `/api/v2` can be added as a new route set alongside v1.
+A REST route is declared once in the API route system. The same definition drives request validation, authentication mode, permission/scope enforcement, CSRF requirements, step-up authentication, rate limits, and OpenAPI output.
 
-## Requirements
+---
 
-- Docker 24+ with Docker Compose v2 (production), **or**
-- Node.js 22.9+, PostgreSQL 14+, Redis 6.2+ (development)
-- Optional: ClamAV (`--profile clamav`), an S3-compatible bucket
+## Technology stack
 
-## Installation
-
-```bash
-git clone <repo> cdn && cd cdn
-cp .env.example .env
-# Fill in the REQUIRED values (commands are in the comments):
-#   POSTGRES_PASSWORD, REDIS_PASSWORD, SESSION_SECRET, MASTER_ENCRYPTION_KEY, *_URL
-```
-
-## Docker deployment
-
-```bash
-docker compose up -d --build                 # postgres, redis, migrate, api, worker, web, nginx
-docker compose exec api npm run create-admin # prompts for email, name and password
-```
-
-Open `APP_URL`, sign in and enable two-factor authentication under **Account & security**. There are no default credentials; `create-admin` is the only bootstrap path and needs shell access to the host.
-
-- The `migrate` service applies Prisma migrations before the API starts; the API re-seeds the permission catalogue and built-in roles on boot (idempotent).
-- Health: `GET /health` (liveness), `GET /health/ready` (PostgreSQL, Redis, storage).
-- Optional services: `docker compose --profile clamav up -d` then set `CLAMAV_HOST=clamav` and enable *Settings → Uploads → Require malware scan*.
-- **Dockge (prebuilt images)**: `deploy/dockge/compose.yaml` is self-contained — it pulls `ghcr.io/cachenetworks/cdnpanel-api` / `-web` (built by GitHub Actions on every push to `main`) and embeds the Nginx config. In Dockge create a stack `cdn`, paste the compose file, fill in `deploy/dockge/.env.example` as the stack `.env`, run `docker login ghcr.io` once on the host (token with `read:packages`, since the images are private), then deploy. Update by pressing *Update* in Dockge (pulls `:latest`).
-- **Dockge (build from source)**: alternatively put the repository itself in `/opt/stacks/cdn` with its `.env`; the root `docker-compose.yml` builds the images locally.
-
-## Environment configuration
-
-See `.env.example` for every variable. The process refuses to boot when required values are missing, malformed (e.g. a master key that is not 32 bytes) or unsafe in production (`TRUST_PROXY=true`, placeholder secrets).
-
-| Variable | Purpose |
+| Layer | Technology |
 |---|---|
-| `APP_URL`, `CDN_URL`, `API_URL` | Public URLs. May all be the same host (single domain) or separate hosts. |
-| `CORS_ORIGINS` | Extra browser origins allowed to call the API with bearer keys. |
-| `SESSION_SECRET` | ≥32 chars. |
-| `MASTER_ENCRYPTION_KEY` | 32 random bytes (base64). Derives the AES-256-GCM, API-key-hash, signed-URL and CSRF subkeys via HKDF. **Back it up.** |
-| `MASTER_ENCRYPTION_KEY_VERSION`, `MASTER_ENCRYPTION_KEYS_PREVIOUS` | Key rotation (see Security model). |
-| `STORAGE_DRIVER`, `LOCAL_STORAGE_PATH`, `S3_*` | Default storage provider. |
-| `TRUST_PROXY` | Proxy IPs/CIDRs whose `X-Forwarded-For` is honoured. |
-| `TRUST_CLOUDFLARE_HEADERS` | Use `CF-Connecting-IP` / `CF-IPCountry` (only from trusted proxies). |
-| `DELIVERY_MODE` | `stream`, `x-accel` (Nginx serves local files) or `redirect` (S3 presigned URLs). |
-| `MAX_UPLOAD_SIZE` | Hard cap; the dashboard setting can only lower it. Keep Nginx `client_max_body_size` in sync. |
+| API | Fastify + TypeScript |
+| Dashboard | Next.js 15 + React 19 + Tailwind |
+| Database | PostgreSQL + Prisma |
+| Queue / rate limiting | Redis + BullMQ |
+| Worker | Node.js / TypeScript |
+| Local delivery | Nginx + X-Accel-Redirect |
+| Object storage | S3-compatible API |
+| Malware scanning | ClamAV |
+| Containers | Docker / Docker Compose |
+| CI / images | GitHub Actions + GHCR |
 
-Runtime settings (upload rules, cache headers, rate limits, session lifetimes, 2FA policy, retention, analytics privacy, webhooks) are edited under **Settings** and audited.
+### Requirements
 
-## Storage configuration
+For production deployment:
 
-The environment defines the *default* provider. More providers can be added under **Storage** — their credentials are stored encrypted with AES-256-GCM (bound to the provider id) and never returned by the API.
+- Docker 24+;
+- Docker Compose v2.
 
-| Provider | Endpoint | Notes |
-|---|---|---|
-| Local | — | Must be inside `LOCAL_STORAGE_ALLOWED_ROOT` (`/data` in Docker). |
-| AWS S3 | *(empty)* | Region required. |
-| Cloudflare R2 | `https://<account>.r2.cloudflarestorage.com` | Region `auto`. |
-| MinIO | `http://minio:9000` | Path-style addressing. |
-| Backblaze B2 | `https://s3.<region>.backblazeb2.com` | Use an application key. |
+For development without the full Docker stack:
 
-Stored object keys are generated from file ids (`objects/ab/cd/file_…`) — user-supplied names never touch the filesystem, and the local driver re-verifies every resolved path (including symlinks) stays inside its root.
+- Node.js 22.9+;
+- PostgreSQL 14+;
+- Redis 6.2+.
 
-For large deployments use `DELIVERY_MODE=x-accel` (local) so Nginx streams bytes after the API authorises the request, or `DELIVERY_MODE=redirect` (S3) to hand clients a short-lived presigned URL.
+Optional:
 
-## Cloudflare configuration
+- ClamAV;
+- an S3-compatible storage service;
+- Cloudflare Tunnel or a Cloudflare-proxied hostname.
 
-Recommended: **Cloudflare Tunnel** (`cloudflared`) → `http://localhost:8873`. The origin then needs no open inbound ports.
+---
 
-```yaml
-# /etc/cloudflared/config.yml
-ingress:
-  - hostname: cdn.example.com
-    service: http://localhost:8873
-    originRequest: { disableChunkedEncoding: false }
-  - service: http_status:404
+## Quick start
+
+Clone the repository:
+
+```bash
+git clone https://github.com/cachenetworks/CDNPanel.git
+cd CDNPanel
+cp .env.example .env
 ```
 
-`.env`: `TRUST_CLOUDFLARE_HEADERS=true`. In the compose setup the API trusts only the Docker networks (Nginx), and Nginx forwards `CF-Connecting-IP`/`CF-IPCountry` only for requests arriving from loopback / the Docker bridge (the tunnel). Requests reaching port 8873 from elsewhere have those headers stripped, so they cannot spoof client IPs.
+Generate and configure the required secrets in `.env`.
 
-Firewall: do not expose 8873 publicly when using a tunnel. If you use a proxied DNS record instead of a tunnel, publish Nginx on a Cloudflare-supported port (e.g. 443/8443), allow inbound traffic **only** from [Cloudflare IP ranges](https://www.cloudflare.com/ips/), and use Full (strict) TLS.
+At minimum, review:
 
-Cloudflare caches public files according to the `Cache-Control` the platform sends (`public, max-age=31536000, immutable` by default); private and signed responses are `private, no-store`. Cloudflare's 100 MB upload limit per request applies — the dashboard automatically uses chunked uploads above 64 MB.
+```text
+POSTGRES_PASSWORD
+REDIS_PASSWORD
+SESSION_SECRET
+MASTER_ENCRYPTION_KEY
+APP_URL
+CDN_URL
+API_URL
+```
 
-## Nginx configuration
+Then start the stack:
 
-`infrastructure/nginx/` contains the production config:
+```bash
+docker compose up -d --build
+```
 
-- Unbuffered request bodies for `/api/` (uploads stream directly to storage), 600 s timeouts, `client_max_body_size 5g`.
-- `/files/` and `/p/` are authorised by the API and served from an `internal` location via `X-Accel-Redirect`, so Nginx handles ranges and sendfile without buffering whole files.
-- `X-Forwarded-For` is overwritten (not appended); access logs use `$uri` so signed-URL signatures are never logged.
-- An extra `limit_req` zone protects the login endpoint.
+Create the initial administrator:
 
-For a split-domain setup (`panel.`, `api.`, `cdn.`), create one `server` block per host: panel → `web` plus `/api/`, api → `api`, cdn → only `/files/` and `/p/`.
+```bash
+docker compose exec api npm run create-admin
+```
+
+There are **no default credentials**.
+
+After signing in, enable two-factor authentication for the founder/admin account.
+
+### Health checks
+
+```text
+GET /health
+GET /health/ready
+```
+
+`/health` is the liveness endpoint.
+
+`/health/ready` verifies critical dependencies including PostgreSQL, Redis, and storage availability.
+
+---
+
+## Docker and Dockge deployment
+
+### Source build
+
+The root `docker-compose.yml` builds the application locally.
+
+```bash
+docker compose up -d --build
+```
+
+### Dockge / prebuilt images
+
+`deploy/dockge/compose.yaml` is intended for deployments that use the images published by GitHub Actions:
+
+```text
+ghcr.io/cachenetworks/cdnpanel-api
+ghcr.io/cachenetworks/cdnpanel-web
+```
+
+The normal flow is:
+
+1. create a Dockge stack;
+2. use `deploy/dockge/compose.yaml`;
+3. configure the stack environment from `deploy/dockge/.env.example`;
+4. authenticate the host to GHCR where required;
+5. deploy the stack;
+6. use Dockge's normal update flow to pull newer images.
+
+The GitHub Actions workflow runs type checks, linting, and tests before publishing application images.
+
+---
+
+## Storage
+
+CDNPanel supports multiple storage providers.
+
+| Provider | Kind | Notes |
+|---|---|---|
+| Local filesystem | `LOCAL` | restricted to the configured storage root |
+| AWS S3 | `S3` | standard S3 API |
+| Cloudflare R2 | `R2` | S3-compatible, region `auto` |
+| MinIO | `MINIO` | S3-compatible, commonly path-style |
+| Backblaze B2 | `B2` | S3-compatible B2 endpoint |
+
+Storage-provider credentials are encrypted using AES-256-GCM and are not returned back through the normal API.
+
+Stored object keys are generated from internal file IDs rather than user-provided filenames.
+
+Example object layout:
+
+```text
+objects/ab/cd/file_...
+```
+
+The local storage driver re-validates resolved paths to prevent escaping the configured storage root.
+
+### Delivery modes
+
+`DELIVERY_MODE` can be configured as:
+
+- `stream` — the API streams file bytes;
+- `x-accel` — the API authorises access and Nginx serves local bytes;
+- `redirect` — the API authorises access and redirects to a short-lived storage URL.
+
+For large local deployments, `x-accel` is generally the preferred mode.
+
+For S3-compatible object storage, `redirect` can reduce application-server bandwidth.
+
+---
+
+## File delivery
+
+Canonical delivery endpoints include:
+
+```text
+GET  /files/{id}
+HEAD /files/{id}
+
+GET  /p/{folder}/{file}
+HEAD /p/{folder}/{file}
+```
+
+The delivery layer handles:
+
+- authorisation;
+- signed URLs;
+- visibility;
+- ranges;
+- ETags;
+- conditional requests;
+- cache headers;
+- safe content-disposition behaviour;
+- analytics;
+- storage access.
+
+HTML, SVG, XML, JavaScript, PDF, and other active or potentially risky content can be forced into safer download behaviour and sandboxed response policies.
+
+---
+
+## Authentication and RBAC
+
+Staff authentication and API authentication are deliberately separate.
+
+Dashboard/admin routes use secure staff sessions.
+
+External API clients use bearer API keys.
+
+Sensitive staff actions can require recent password/TOTP confirmation even when the current session is otherwise valid.
+
+Examples include:
+
+- destructive user changes;
+- role changes;
+- mass deletion;
+- storage configuration changes;
+- security settings;
+- revoke-all operations;
+- two-factor resets.
+
+---
+
+## API keys
+
+Example:
+
+```bash
+curl \
+  -H "Authorization: Bearer cdn_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
+  https://cdn.example.com/api/v1/files
+```
+
+API errors use a predictable structure:
+
+```json
+{
+  "error": {
+    "code": "invalid_api_key",
+    "message": "The supplied API key is invalid.",
+    "request_id": "req_..."
+  }
+}
+```
+
+API keys are never stored in plaintext after creation.
+
+---
 
 ## Security model
 
-| Concern | Implementation |
+CDNPanel is designed with defence in depth.
+
+| Area | Implementation |
 |---|---|
-| Passwords | Argon2id (64 MiB, t=3), rehash on login when parameters change, policy check. |
-| API keys | 190-bit random secret; stored as `HMAC-SHA256(HKDF(master,"api-key-hash"), key)` + version + display prefix; looked up by hash, compared with `timingSafeEqual`; shown once. |
-| Encryption at rest | AES-256-GCM, format `enc.v1.<keyVersion>.<iv>.<tag>.<ciphertext>`, AAD binds each value to its row. Used for storage credentials, TOTP secrets, webhook secrets and API key notes. |
-| Key rotation | Set a new `MASTER_ENCRYPTION_KEY` + increment `MASTER_ENCRYPTION_KEY_VERSION`, move the old key into `MASTER_ENCRYPTION_KEYS_PREVIOUS="1:<old>"`. Old ciphertexts, API key hashes and signed URLs keep working; new data uses the new key. |
-| Sessions | 256-bit token in an HttpOnly, SameSite=Lax cookie (`__Host-` prefixed and Secure over HTTPS); only SHA-256 stored; expiry, revocation, logout-all. |
-| CSRF | Cookie-authenticated mutations require `X-CSRF-Token` = HMAC(session token) plus an allowed `Origin`. Bearer requests are not cookie-based. |
-| Authorization | Every route declares its auth mode, permissions and scopes; enforced server-side before validation and handlers. Admin endpoints reject API keys. |
-| Step-up | Deleting users/roles, many files or folder trees, storage changes, security settings, revoke-all, 2FA resets require password (+TOTP) confirmation within a short window. |
-| Brute force | Per-IP and per-account login limits, temporary lockout, MFA attempt limits, Redis-backed global/IP/key/route rate limits with `X-RateLimit-*` headers. |
-| Uploads | Normalised names, blocked extensions, signature-based type detection, size/quota limits, checksum verification, optional ClamAV with quarantine; files are not served until `READY`. |
-| Stored XSS | Active content is forced to download with `Content-Security-Policy: sandbox` and `nosniff`; the dashboard CSP forbids third-party scripts. |
-| Logging | Structured JSON with request ids; `Authorization`, cookies, passwords, tokens, keys and secrets are redacted; audit metadata is sanitised. |
-| Audit integrity | A PostgreSQL trigger rejects UPDATE/DELETE on audit rows except explicit retention pruning. |
-| SSRF | Webhook targets must resolve to public addresses (override with `WEBHOOK_ALLOW_PRIVATE_NETWORKS`). |
-| CORS | Explicit allowlist with credentials for the API; delivery routes allow any origin without credentials. |
+| Passwords | Argon2id with rehash support |
+| API keys | random secret + keyed HMAC hash |
+| Encryption at rest | AES-256-GCM |
+| Key derivation | HKDF-derived subkeys |
+| Key rotation | current + previous master-key versions |
+| Sessions | random tokens, only hashes stored server-side |
+| Cookies | HttpOnly, SameSite, Secure where applicable |
+| CSRF | origin validation + session-bound token |
+| 2FA | TOTP + recovery codes |
+| Authorisation | route-declared permissions/scopes |
+| Sensitive actions | step-up re-authentication |
+| Login protection | per-IP/per-account throttling and lockout |
+| API protection | Redis-backed global/key/route limits |
+| Uploads | file rules, signature detection, integrity checks |
+| Malware | optional ClamAV quarantine |
+| Path handling | generated storage keys + root validation |
+| Stored active content | forced-safe delivery and CSP |
+| Logging | structured logs with secret redaction |
+| Audit log | append-only enforcement in PostgreSQL |
+| Webhooks | HMAC signatures + SSRF-aware target validation |
+| Proxy IPs | trusted-proxy / Cloudflare-aware resolution |
 
-## API authentication
+No self-hosted application is automatically secure simply because it includes security controls. Operators are responsible for correct deployment, TLS, firewalling, backups, secrets, dependency updates, and host security.
 
-```bash
-curl -H "Authorization: Bearer cdn_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" https://cdn.example.com/api/v1/files
-```
+---
 
-Errors always look like `{"error":{"code":"invalid_api_key","message":"…","request_id":"req_…"}}`.
+## Analytics and audit logs
+
+Raw request analytics can be retained temporarily and rolled up into longer-term daily records.
+
+Analytics can be broken down by:
+
+- file;
+- folder;
+- API key;
+- MIME type;
+- country;
+- status code;
+- request type.
+
+Privacy controls allow IP storage to be configured as:
+
+- full;
+- anonymised;
+- disabled.
+
+User-agent retention can also be controlled.
+
+Audit records are designed for administrative accountability and are protected against ordinary update/delete operations at the database layer.
+
+---
+
+## Webhooks
+
+Webhook deliveries are signed and retried.
+
+The system records:
+
+- event name;
+- payload;
+- delivery state;
+- attempts;
+- response status;
+- response body where permitted;
+- last error;
+- next retry time;
+- delivery time.
+
+Webhook secrets are stored encrypted.
+
+---
 
 ## API documentation
 
-- Interactive reference: **`/dashboard/docs`** (search, per-endpoint scopes/permissions, parameters, examples in curl/JavaScript/Node.js/Python, Try it). API keys typed into Try it live only in page memory.
-- Machine-readable: **`/openapi.json`** (OpenAPI 3.1). Export with `npm run openapi -w @cdn/api -- openapi.json`.
+Machine-readable OpenAPI:
 
-## Backups
-
-See [docs/backups.md](docs/backups.md). In short: `scripts/backup-postgres.sh` for the database, a separate backup of the `cdn-data` volume or bucket for file contents, and the `.env` (especially `MASTER_ENCRYPTION_KEY`) in a password manager.
-
-## Updating
-
-```bash
-cd /opt/stacks/cdn
-./scripts/backup-postgres.sh
-git pull                       # or replace the files
-docker compose up -d --build   # migrate runs automatically before the API starts
+```text
+/openapi.json
+/api/v1/openapi.json
 ```
 
-## Troubleshooting
+Interactive staff documentation:
+
+```text
+/dashboard/docs
+```
+
+To export the schema during development:
+
+```bash
+npm run openapi -w @cdn/api -- openapi.json
+```
+
+---
+
+## Cloudflare
+
+A recommended production setup is:
+
+```text
+Internet
+   │
+Cloudflare
+   │
+Cloudflare Tunnel
+   │
+localhost:8873
+   │
+Nginx
+   │
+CDNPanel
+```
+
+Example tunnel configuration:
+
+```yaml
+ingress:
+  - hostname: cdn.example.com
+    service: http://localhost:8873
+    originRequest:
+      disableChunkedEncoding: false
+
+  - service: http_status:404
+```
+
+When the origin is reachable only through a tunnel, inbound public origin ports do not need to be exposed.
+
+If using normal proxied DNS instead, restrict the origin appropriately and use strict TLS.
+
+CDNPanel can trust Cloudflare client-IP/country headers only when requests arrive through configured trusted proxies. Do not enable trusted proxy behaviour blindly.
+
+---
+
+## Health and operations
+
+Useful operational checks include:
+
+```bash
+docker compose ps
+docker compose logs api
+docker compose logs worker
+docker compose logs web
+docker compose logs nginx
+```
+
+If readiness fails, inspect:
+
+- PostgreSQL connectivity;
+- Redis connectivity;
+- storage credentials;
+- local-volume permissions;
+- worker status;
+- proxy configuration.
+
+### Common issues
 
 | Symptom | Check |
 |---|---|
-| API exits immediately | `docker compose logs api` — the env validator prints exactly which variable is missing/invalid. |
-| `/health/ready` returns 503 | Which check is `error`: database, redis or storage (volume permissions / bucket credentials). |
-| Every client IP is the proxy IP | `TRUST_PROXY` must include the proxy address; behind Cloudflare also `TRUST_CLOUDFLARE_HEADERS=true`. |
-| Uploads fail at ~100 MB | Cloudflare request limit — use chunked uploads (the dashboard does automatically). |
-| `413 file_too_large` | Settings → Uploads limit, `MAX_UPLOAD_SIZE`, Nginx `client_max_body_size`. |
-| `csrf_failed` | Dashboard served from an origin not listed in `APP_URL`/`CORS_ORIGINS`. |
-| Files stuck in `SCANNING` | Worker logs; ClamAV reachable at `CLAMAV_HOST`? |
-| Analytics empty | Settings → Analytics enabled; worker running for roll-ups. |
-| Lost `MASTER_ENCRYPTION_KEY` | Encrypted fields are unrecoverable and all API keys must be re-issued. |
+| API exits on startup | required environment values and secret validation |
+| `/health/ready` returns 503 | database, Redis, or storage readiness |
+| client IP always equals proxy IP | `TRUST_PROXY` configuration |
+| uploads fail around proxy limits | use resumable/chunked upload flow |
+| `413 file_too_large` | dashboard limit, `MAX_UPLOAD_SIZE`, Nginx body size |
+| `csrf_failed` | `APP_URL`, CORS, request origin |
+| files remain in `SCANNING` | worker and ClamAV connectivity |
+| analytics are empty | analytics settings and worker roll-ups |
+| encrypted settings become unreadable | verify the master encryption key and rotation config |
+
+> [!CAUTION]
+> Losing `MASTER_ENCRYPTION_KEY` can make encrypted configuration unrecoverable and can require API credentials to be re-issued. Back it up securely.
+
+---
+
+## Backups
+
+Database backup tooling is documented in [docs/backups.md](docs/backups.md).
+
+A complete backup plan should cover:
+
+1. PostgreSQL;
+2. file/object storage;
+3. deployment configuration;
+4. environment secrets;
+5. `MASTER_ENCRYPTION_KEY`;
+6. any previous encryption keys required during key rotation.
+
+Database-only backups are **not** sufficient if your actual file data lives separately.
+
+---
+
+## Updating
+
+Before an update:
+
+```bash
+./scripts/backup-postgres.sh
+```
+
+Then update and redeploy:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+The migration service applies Prisma migrations before the application starts.
+
+For image-based deployments, pull the new release/image according to your deployment tooling.
+
+---
 
 ## Development
 
+Install dependencies:
+
 ```bash
 npm install
-cp .env.example .env               # point DATABASE_URL / REDIS_URL at local services
-npm run db:migrate && npm run db:seed
-npm run create-admin -- # (build first: npm run build)
-npm run dev                        # api :4000, worker, web :3000 (proxies /api, /files, /p)
-
-npm run build       # all packages and apps
-npm run typecheck
-npm run lint
-npm test            # unit + integration (integration needs Postgres + Redis; TEST_DATABASE_URL / TEST_REDIS_URL)
 ```
 
-The integration suite resets the `cdn_test` database and exercises login, CSRF, RBAC, API keys (revoked/expired/scopes/IP/endpoint/rate limit/rotation), uploads, delivery (HEAD, ranges, 304), private files, signed URL forgery and expiry, path traversal, malformed ids, chunked uploads, analytics and audit-log immutability.
+Configure local services:
 
+```bash
+cp .env.example .env
+```
+
+Generate Prisma and prepare the database:
+
+```bash
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+```
+
+Build the shared packages where needed, then create an admin:
+
+```bash
+npm run build
+npm run create-admin
+```
+
+Start the development stack:
+
+```bash
+npm run dev
+```
+
+Typical local services:
+
+```text
+web       :3000
+api       :4000
+worker    background process
+```
+
+### Useful commands
+
+```bash
+npm run build
+npm run typecheck
+npm run lint
+npm test
+npm run test:unit
+npm run test:integration
+```
+
+---
+
+## Testing
+
+The test suite covers security and application behaviour including:
+
+- login;
+- CSRF;
+- RBAC;
+- API-key scopes;
+- revoked and expired API keys;
+- API-key IP restrictions;
+- API-key endpoint restrictions;
+- key rate limiting;
+- key rotation;
+- uploads;
+- delivery;
+- HEAD requests;
+- Range requests;
+- `304` responses;
+- private files;
+- signed-URL forgery;
+- signed-URL expiry;
+- path traversal;
+- malformed IDs;
+- chunked uploads;
+- analytics;
+- audit-log immutability.
+
+GitHub Actions runs the automated checks before publishing application images.
+
+---
+
+## Contributing
+
+Community development is welcome.
+
+You are explicitly allowed to create a GitHub fork for genuine CDNPanel contribution work such as:
+
+- fixes;
+- feature proposals;
+- documentation;
+- tests;
+- refactors;
+- performance improvements;
+- issue reproductions;
+- code-review suggestions;
+- pull requests.
+
+Start by reading [CONTRIBUTING.md](CONTRIBUTING.md).
+
+A community fork is **not** permission to create an independent CDNPanel product, mirror, resale, hosted service, rebrand, package distribution, or competing release.
+
+If you find a bug, open an issue with enough detail to reproduce it.
+
+If you have a code improvement, keep the change focused, add or update tests where practical, and explain why the change is useful.
+
+---
 
 ## License
 
-CDNPanel is **source-available, not open source**. It is licensed under the [Cache Networks Personal Use License](LICENSE).
+CDNPanel uses the **Cache Networks Source-Available Personal & Community Contribution License v2.0**.
 
-You may use and modify it for your own personal, non-commercial use. General redistribution, re-hosting, resale, sublicensing, commercial/organisational use, and publishing CDNPanel as a separate product are not permitted without prior written permission from Cache Networks.
+This is a custom **source-available** license and is **not an open-source license**.
 
-**Community forks are welcome.** You may fork CDNPanel on GitHub to prepare fixes, features, documentation, tests, code-review suggestions, issue reproductions, or pull requests that help the official project grow. Community forks must keep the license and attribution, remain clearly unofficial, and cannot be turned into a competing product, hosted service, resale, mirror, or independent release.
+### At a glance
 
-If you copy or derive code from CDNPanel for another project, the applicable source must retain clear attribution to **Cache Networks** and link back to this repository. See [LICENSE](LICENSE) for the full terms and contribution grant.
+| Activity | Status |
+|---|---|
+| View the source | ✅ Allowed |
+| Download for personal use | ✅ Allowed |
+| Run privately for personal, non-commercial use | ✅ Allowed |
+| Modify privately | ✅ Allowed |
+| Fork on GitHub to contribute to CDNPanel | ✅ Allowed |
+| Submit pull requests | ✅ Allowed |
+| Maintain a public contribution fork | ✅ Allowed |
+| Publish your own CDNPanel distribution | ❌ Not allowed |
+| Rebrand CDNPanel as your own | ❌ Not allowed |
+| Mirror it as another download source | ❌ Not allowed |
+| Publish independent binaries/packages/containers | ❌ Not allowed |
+| Use it for a business or organisation | ❌ Permission required |
+| Sell or monetise it | ❌ Permission required |
+| Offer it as a hosted/managed service | ❌ Permission required |
+| Copy protected code into another distributed project | ❌ Permission required |
+| Remove attribution from copied code | ❌ Not allowed |
+
+### Attribution
+
+Where permission exists to copy or adapt protected CDNPanel code, the license requires attribution substantially equivalent to:
+
+```text
+Contains code derived from CDNPanel by Cache Networks.
+Original project: https://github.com/cachenetworks/CDNPanel
+Licensed under the Cache Networks Source-Available Personal &
+Community Contribution License.
+```
+
+Read the complete [LICENSE](LICENSE) before relying on any permission.
+
+> [!NOTE]
+> The license is intentionally restrictive about redistribution and commercial use while remaining friendly to genuine community contribution.
+
+---
+
+## Project status
+
+CDNPanel is actively developed.
+
+The project prioritises:
+
+- security;
+- predictable deployment;
+- maintainability;
+- self-hosting;
+- transparent API behaviour;
+- operational visibility;
+- community-driven improvements without allowing unauthorised redistribution.
+
+---
+
+Built and maintained under **Cache Networks**.
