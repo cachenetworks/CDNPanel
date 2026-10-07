@@ -10,7 +10,7 @@ A self-hosted CDN and file delivery platform: secure uploads, public/private fil
 
 ## Contents
 
-1. [Features](#features) · 2. [Architecture](#architecture) · 3. [Requirements](#requirements) · 4. [Installation](#installation) · 5. [Docker deployment](#docker-deployment) · 6. [Environment](#environment-configuration) · 7. [Storage](#storage-configuration) · 8. [Cloudflare](#cloudflare-configuration) · 9. [Nginx](#nginx-configuration) · 10. [Security model](#security-model) · 11. [API authentication](#api-authentication) · 12. [API documentation](#api-documentation) · 13. [Backups](#backups) · 14. [Updating](#updating) · 15. [Troubleshooting](#troubleshooting) · 16. [Development](#development)
+1. [Features](#features) · 2. [Architecture](#architecture) · 3. [Requirements](#requirements) · 4. [Installation](#installation) · 5. [Docker deployment](#docker-deployment) · 6. [Environment](#environment-configuration) · 7. [Storage](#storage-configuration) · 8. [Cloudflare](#cloudflare-configuration) · 9. [Nginx](#nginx-configuration) · 10. [Security model](#security-model) · 11. [API authentication](#api-authentication) · 12. [API documentation](#api-documentation) · 13. [Backups](#backups) · 14. [Updating](#updating) · 15. [Troubleshooting](#troubleshooting) · 16. [Development](#development) · 17. [License](#license)
 
 ## Features
 
@@ -233,3 +233,12 @@ npm test            # unit + integration (integration needs Postgres + Redis; TE
 ```
 
 The integration suite resets the `cdn_test` database and exercises login, CSRF, RBAC, API keys (revoked/expired/scopes/IP/endpoint/rate limit/rotation), uploads, delivery (HEAD, ranges, 304), private files, signed URL forgery and expiry, path traversal, malformed ids, chunked uploads, analytics and audit-log immutability.
+
+
+## License
+
+CDNPanel is **source-available, not open source**. It is licensed under the [Cache Networks Personal Use License](LICENSE).
+
+You may use and modify it for your own personal, non-commercial use. Redistribution, re-hosting, resale, sublicensing, commercial/organisational use, and publishing modified copies are not permitted without prior written permission from Cache Networks.
+
+If you copy or derive code from CDNPanel for another project, the applicable source must retain clear attribution to **Cache Networks** and link back to this repository. See [LICENSE](LICENSE) for the full terms.
