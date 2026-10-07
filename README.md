@@ -239,6 +239,8 @@ The integration suite resets the `cdn_test` database and exercises login, CSRF, 
 
 CDNPanel is **source-available, not open source**. It is licensed under the [Cache Networks Personal Use License](LICENSE).
 
-You may use and modify it for your own personal, non-commercial use. Redistribution, re-hosting, resale, sublicensing, commercial/organisational use, and publishing modified copies are not permitted without prior written permission from Cache Networks.
+You may use and modify it for your own personal, non-commercial use. General redistribution, re-hosting, resale, sublicensing, commercial/organisational use, and publishing CDNPanel as a separate product are not permitted without prior written permission from Cache Networks.
 
-If you copy or derive code from CDNPanel for another project, the applicable source must retain clear attribution to **Cache Networks** and link back to this repository. See [LICENSE](LICENSE) for the full terms.
+**Community forks are welcome.** You may fork CDNPanel on GitHub to prepare fixes, features, documentation, tests, code-review suggestions, issue reproductions, or pull requests that help the official project grow. Community forks must keep the license and attribution, remain clearly unofficial, and cannot be turned into a competing product, hosted service, resale, mirror, or independent release.
+
+If you copy or derive code from CDNPanel for another project, the applicable source must retain clear attribution to **Cache Networks** and link back to this repository. See [LICENSE](LICENSE) for the full terms and contribution grant.
