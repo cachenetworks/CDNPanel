@@ -89,7 +89,8 @@ Open `APP_URL`, sign in and enable two-factor authentication under **Account & s
 - The `migrate` service applies Prisma migrations before the API starts; the API re-seeds the permission catalogue and built-in roles on boot (idempotent).
 - Health: `GET /health` (liveness), `GET /health/ready` (PostgreSQL, Redis, storage).
 - Optional services: `docker compose --profile clamav up -d` then set `CLAMAV_HOST=clamav` and enable *Settings → Uploads → Require malware scan*.
-- **Dockge**: put the repository in `/opt/stacks/cdn` (with its `.env`) and it appears as the `cdn` stack.
+- **Dockge (prebuilt images)**: `deploy/dockge/compose.yaml` is self-contained — it pulls `ghcr.io/cachenetworks/cdnpanel-api` / `-web` (built by GitHub Actions on every push to `main`) and embeds the Nginx config. In Dockge create a stack `cdn`, paste the compose file, fill in `deploy/dockge/.env.example` as the stack `.env`, run `docker login ghcr.io` once on the host (token with `read:packages`, since the images are private), then deploy. Update by pressing *Update* in Dockge (pulls `:latest`).
+- **Dockge (build from source)**: alternatively put the repository itself in `/opt/stacks/cdn` with its `.env`; the root `docker-compose.yml` builds the images locally.
 
 ## Environment configuration
 

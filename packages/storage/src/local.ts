@@ -58,7 +58,7 @@ export class LocalStorageDriver implements StorageDriver {
     // Write to a temp file and atomically rename, so readers never see partial objects.
     const tmp = `${target}.${randomBytes(6).toString('hex')}.tmp`;
     try {
-      await pipeline(Buffer.isBuffer(body) ? Readable.from([body]) : body, createWriteStream(tmp, { flags: 'wx', mode: 0o640 }));
+      await pipeline(Buffer.isBuffer(body) ? Readable.from([body]) : body, createWriteStream(tmp, { flags: 'wx', mode: 0o644 }));
       await fs.rename(tmp, target);
     } catch (err) {
       await fs.rm(tmp, { force: true });
