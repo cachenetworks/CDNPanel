@@ -1,0 +1,146 @@
+Cache Networks Personal Use License
+Version 1.0 — 8 October 2026
+
+Copyright (c) 2026 Cache Networks. All rights reserved.
+
+This software, source code, documentation, assets, configuration, and all other
+materials in this repository (collectively, the "Software") are made available
+under the terms of this Cache Networks Personal Use License ("License").
+
+THIS IS A SOURCE-AVAILABLE LICENSE. IT IS NOT AN OPEN-SOURCE LICENSE.
+
+1. PERMITTED USE
+
+Subject to all terms of this License, Cache Networks grants you a limited,
+revocable, non-exclusive, non-transferable, non-sublicensable license to:
+
+a. download and inspect the Software;
+b. run the Software for your own personal, non-commercial use;
+c. modify the Software for your own personal, non-commercial use; and
+d. make private backup copies reasonably necessary for that permitted use.
+
+"Personal use" means use by you for your own private purposes. It does not
+include use on behalf of a company, organisation, customer, client, employer,
+community, hosted service, paid service, or other third party unless Cache
+Networks has given you prior written permission.
+
+2. NO REDISTRIBUTION
+
+Except where GitHub's Terms of Service expressly permit use of GitHub's own
+forking or repository functionality, you may not, without prior written
+permission from Cache Networks:
+
+a. redistribute, publish, share, upload, mirror, re-host, transmit, or otherwise
+   make the Software available to any third party;
+b. distribute source code, compiled code, binaries, containers, packages,
+   modified versions, forks, derivative versions, or substantial portions of
+   the Software;
+c. sell, rent, lease, sublicense, relicense, assign, transfer, or commercially
+   exploit the Software;
+d. include the Software, or any substantial portion of it, in another project
+   that is distributed, published, sold, licensed, hosted, or otherwise made
+   available to third parties;
+e. offer the Software, or a modified version of it, as a hosted service,
+   software-as-a-service product, managed service, or service for third parties;
+   or
+f. remove, obscure, or alter copyright, attribution, ownership, or license
+   notices.
+
+A GitHub fork permitted by GitHub's Terms of Service does not grant any
+additional right to redistribute, relicense, commercially use, or otherwise
+use the Software outside the permissions expressly granted by this License.
+
+3. ATTRIBUTION REQUIRED FOR COPIED OR DERIVED CODE
+
+If you copy, adapt, translate, rewrite, port, or derive any identifiable portion
+of the Software for another project, including a small code excerpt where
+copyright protection applies, you must clearly and prominently credit
+Cache Networks.
+
+At minimum, the following attribution must appear in the relevant source file
+or accompanying notices:
+
+    Contains code derived from CDNPanel by Cache Networks.
+    Original project: https://github.com/cachenetworks/CDNPanel
+
+You must also retain any copyright and license notices that were present in the
+copied or derived material.
+
+Attribution does not grant permission to redistribute the Software. If your
+project will be published, shared, sold, hosted for third parties, or otherwise
+distributed, you must first obtain written permission from Cache Networks.
+
+4. NO COMMERCIAL OR ORGANISATIONAL USE
+
+Commercial use, business use, organisational use, customer-facing use, paid
+hosting, resale, monetisation, or use primarily intended to generate revenue is
+not permitted without prior written permission from Cache Networks.
+
+5. NO RELICENSING OR CLAIM OF OWNERSHIP
+
+You may not:
+
+a. claim that you created or own the original Software or any copied portion;
+b. remove or replace Cache Networks attribution in copied or derived material;
+c. place the original Software or copied portions under a different license in
+   a way that suggests you have authority to relicense Cache Networks' work; or
+d. represent a modified copy as an official Cache Networks product.
+
+6. THIRD-PARTY COMPONENTS
+
+The Software may depend on or include third-party software, libraries, assets,
+or components. Those items remain subject to their own applicable licenses.
+Nothing in this License limits rights that a third-party license independently
+grants you to third-party material.
+
+7. OWNERSHIP
+
+The Software is licensed, not sold. Cache Networks retains all right, title,
+interest, copyright, and other intellectual property rights in the Software
+except for third-party material owned by others.
+
+No trademark, brand, logo, trade name, or other branding rights are granted by
+this License.
+
+8. TERMINATION
+
+Your rights under this License terminate automatically if you breach any term
+of this License.
+
+Upon termination, you must stop using the Software and delete all copies in
+your possession or control, except where retention is required by applicable
+law.
+
+Termination does not limit any rights or remedies available to Cache Networks
+for a prior breach.
+
+9. PERMISSION FOR OTHER USES
+
+Any use not expressly permitted by this License requires prior written
+permission from Cache Networks.
+
+Cache Networks may grant separate commercial, redistribution, hosting, or other
+licenses on different terms at its sole discretion.
+
+10. DISCLAIMER OF WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, CACHE NETWORKS WILL NOT BE LIABLE FOR
+ANY CLAIM, LOSS, DAMAGE, LIABILITY, DATA LOSS, SERVICE INTERRUPTION, OR OTHER
+CONSEQUENCE ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+
+11. SEVERABILITY
+
+If any provision of this License is found unenforceable, the remaining
+provisions will continue in effect to the maximum extent permitted by law.
+
+12. ENTIRE LICENSE
+
+This License states the permissions granted by Cache Networks for the Software.
+All rights not expressly granted are reserved.
+
+By using, copying, or modifying the Software, you agree to comply with this
+License.
