@@ -42,7 +42,7 @@ function looksLikeText(buf: Buffer): boolean {
 
 /** Detects markup that browsers would render as HTML/SVG/XML regardless of the name. */
 function detectMarkup(buf: Buffer): string | null {
-  const head = buf.subarray(0, 4096).toString('utf8').replace(/^﻿/, '').trimStart().toLowerCase();
+  const head = buf.subarray(0, 4096).toString('utf8').replace(/^\uFEFF/, '').trimStart().toLowerCase();
   if (/^<svg[\s>]/.test(head) || (/^<\?xml/.test(head) && head.includes('<svg'))) return 'image/svg+xml';
   if (/^<!doctype html|^<html[\s>]|^<head[\s>]|^<body[\s>]|^<script[\s>]|^<iframe[\s>]/.test(head)) return 'text/html';
   if (/^<\?xml/.test(head)) return 'application/xml';

@@ -6,7 +6,7 @@ import { StorageKeyError } from './types.js';
  *   objects/<2 chars>/<2 chars>/<file id>
  * They are still strictly validated before touching any backend as defence in depth.
  */
-const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9_\-]*(\/[A-Za-z0-9][A-Za-z0-9_\-.]*)*$/;
+const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*(\/[A-Za-z0-9][A-Za-z0-9_.-]*)*$/;
 
 export function assertSafeKey(key: string): void {
   if (
