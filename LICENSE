@@ -1,200 +1,787 @@
-Cache Networks Personal Use License
-Version 1.1 — 8 October 2026
+CACHE NETWORKS SOURCE-AVAILABLE PERSONAL & COMMUNITY CONTRIBUTION LICENSE
+Version 2.0 — 8 October 2026
 
-Copyright (c) 2026 Cache Networks. All rights reserved.
+Copyright (c) 2026 Cache Networks.
+All rights reserved except those expressly granted by this License.
 
-This software, source code, documentation, assets, configuration, and all other
-materials in this repository (collectively, the "Software") are made available
-under the terms of this Cache Networks Personal Use License ("License").
+IMPORTANT NOTICE
 
-THIS IS A SOURCE-AVAILABLE LICENSE. IT IS NOT AN OPEN-SOURCE LICENSE.
+This is a custom source-available license. It is NOT an OSI-approved open-source
+license, is NOT a free-software license, and does not grant the unrestricted
+rights normally associated with licenses such as MIT, Apache-2.0, BSD, GPL,
+AGPL, MPL, or similar licenses.
 
-1. PERMITTED PERSONAL USE
+The Software is made publicly viewable so people can inspect it, learn how the
+project works, use it privately, and contribute improvements back to CDNPanel.
+Public availability of the source code does not place the Software in the
+public domain and does not grant a general right to redistribute, repackage,
+rebrand, resell, host, mirror, sublicense, or create a competing product.
 
-Subject to all terms of this License, Cache Networks grants you a limited,
-revocable, non-exclusive, non-transferable, non-sublicensable license to:
+By exercising any permission granted by this License, including downloading,
+using, copying, modifying, forking, or contributing to the Software, you accept
+and agree to comply with this License.
 
-a. download and inspect the Software;
-b. run the Software for your own personal, non-commercial use;
-c. modify the Software for your own personal, non-commercial use; and
-d. make private backup copies reasonably necessary for that permitted use.
+-------------------------------------------------------------------------------
+1. DEFINITIONS
+-------------------------------------------------------------------------------
 
-"Personal use" means use by you for your own private purposes. It does not
-include use on behalf of a company, organisation, customer, client, employer,
-hosted service, paid service, or other third party unless Cache Networks has
-given you prior written permission.
+1.1 "Cache Networks" means the copyright owner or owners publishing CDNPanel
+under the Cache Networks name, together with any successor that lawfully
+acquires the relevant rights.
 
-2. COMMUNITY FORKS AND CONTRIBUTIONS
+1.2 "CDNPanel" means the software project distributed from the official
+repository currently located at:
 
-Notwithstanding the redistribution restrictions below, you may create and
-maintain a GitHub fork of the official CDNPanel repository for genuine
-community-development purposes, including:
+    https://github.com/cachenetworks/CDNPanel
 
-a. preparing fixes, improvements, features, documentation, tests, or refactors;
-b. submitting pull requests or patches to the official CDNPanel repository;
-c. demonstrating a proposed code change for discussion or review;
-d. reproducing and helping diagnose issues;
-e. performing code review or testing related to CDNPanel development; and
-f. collaborating with the CDNPanel community on improvements intended to help
-   the official project grow.
+and any official successor repository designated by Cache Networks.
 
-A community fork under this section must:
+1.3 "Software" means all copyrightable material made available as part of
+CDNPanel by Cache Networks, including source code, scripts, configuration,
+database schemas, migrations, build files, Docker files, user-interface code,
+documentation, examples, tests, templates, project-specific assets, and other
+repository content, except Third-Party Material as defined below.
 
-a. remain clearly identified as an unofficial fork of CDNPanel;
-b. retain this LICENSE file and all copyright and attribution notices;
-c. not be rebranded or represented as an independent, competing, or official
-   product;
-d. not be sold, monetised, sublicensed, packaged for resale, or offered as a
-   hosted or managed service;
-e. not be used as a means to evade the redistribution or commercial-use
-   restrictions of this License; and
-f. be used primarily for contribution, review, testing, discussion, or other
-   bona fide community-development activity connected to CDNPanel.
+1.4 "Official Repository" means the CDNPanel repository controlled by Cache
+Networks and any successor repository explicitly designated by Cache Networks.
 
-This permission includes GitHub's normal public fork functionality and the
-sharing of changes necessary for pull requests and community review. It does
-not grant a general right to redistribute CDNPanel as a separate product,
-download site, mirror, package, release, container image, service, or competing
-project.
+1.5 "You" or "Your" means the individual or legal person exercising rights
+under this License.
 
-3. CONTRIBUTIONS SUBMITTED TO CACHE NETWORKS
+1.6 "Personal Use" means use by a natural person primarily for private,
+non-commercial purposes and not on behalf of a business, employer, customer,
+client, commercial operation, paid community, organisation, or other third
+party.
 
-If you intentionally submit code, documentation, tests, patches, pull requests,
-or other material ("Contribution") to Cache Networks for inclusion in CDNPanel,
-you represent that you have the right to submit that Contribution.
+1.7 "Commercial Use" means use primarily intended for commercial advantage,
+financial compensation, revenue generation, cost recovery from third parties,
+business operations, resale, paid hosting, paid support, paid access,
+subscription services, advertising-supported services, or another activity
+connected with trade or commerce.
 
-You retain ownership of copyright in your original Contribution. By submitting
-it for inclusion in CDNPanel, you grant Cache Networks a perpetual, worldwide,
-irrevocable, non-exclusive, royalty-free license to use, reproduce, modify,
-adapt, publish, distribute, sublicense, relicense, display, perform, and
-otherwise incorporate the Contribution into CDNPanel and related Cache Networks
-projects, products, releases, documentation, and services.
+1.8 "Organisational Use" means use by or for a company, partnership,
+association, incorporated or unincorporated organisation, government body,
+educational institution, club, paid community, employer, client, customer, or
+other group, whether or not the organisation is operated for profit.
 
-This contribution license is intended to let Cache Networks maintain, publish,
-relicense, and develop CDNPanel without requiring separate permission for each
-future release.
+1.9 "Community Fork" means a GitHub fork of the Official Repository maintained
+primarily for bona fide contribution, review, testing, issue reproduction,
+discussion, or development work intended to benefit CDNPanel or assist the
+CDNPanel community.
 
-4. NO GENERAL REDISTRIBUTION
+1.10 "Modification" means any alteration, adaptation, translation, port,
+refactor, extension, deletion, rearrangement, or other change to the Software.
 
-Except for the limited community-fork and contribution permissions in Sections
-2 and 3, you may not, without prior written permission from Cache Networks:
+1.11 "Derivative Work" means a work based upon or incorporating copyrightable
+expression from the Software to the extent recognised by applicable law.
 
-a. redistribute, publish, share, upload, mirror, re-host, transmit, or otherwise
-   make the Software available to any third party;
-b. distribute source code, compiled code, binaries, containers, packages,
-   modified versions, derivative versions, or substantial portions of the
-   Software;
-c. sell, rent, lease, sublicense, relicense, assign, transfer, or commercially
-   exploit the Software;
-d. include the Software, or any substantial portion of it, in another project
-   that is distributed, published, sold, licensed, hosted, or otherwise made
-   available to third parties;
-e. offer the Software, or a modified version of it, as a hosted service,
-   software-as-a-service product, managed service, or service for third parties;
-   or
-f. remove, obscure, or alter copyright, attribution, ownership, or license
-   notices.
+1.12 "Covered Excerpt" means source code or other copyrightable expression
+copied or adapted from the Software, including one or more non-trivial lines,
+functions, classes, components, schemas, configuration blocks, documentation
+passages, or other identifiable expression. A purely functional idea, fact,
+algorithmic concept, public API concept, short name, or independently created
+expression is not automatically a Covered Excerpt merely because it resembles
+the Software.
 
-5. ATTRIBUTION REQUIRED FOR COPIED OR DERIVED CODE
+1.13 "Redistribution" means making the Software, a Modification, a Derivative
+Work, or a substantial or identifiable portion of it available to another
+person by any means, including publication, release, upload, mirror,
+repository, archive, package registry, container registry, download site,
+bundle, binary distribution, source distribution, or transfer.
 
-If you copy, adapt, translate, rewrite, port, or derive any identifiable portion
-of the Software for another project, to the extent that portion is protected by
-applicable copyright law, you must clearly and prominently credit Cache
-Networks.
+1.14 "Hosted Service" means making the Software or a Modification available for
+third-party use over a network, including software-as-a-service (SaaS),
+platform-as-a-service, managed hosting, managed CDN services, hosted control
+panels, hosted APIs, commercial demonstrations, or other remotely accessible
+services.
 
-At minimum, the following attribution must appear in the relevant source file
-or accompanying notices:
+1.15 "Contribution" means code, documentation, tests, designs, patches,
+configuration, examples, or other copyrightable material intentionally
+submitted to Cache Networks for possible inclusion in CDNPanel.
+
+1.16 "Third-Party Material" means material included in, used by, linked from, or
+distributed with the Software that is owned by someone other than Cache
+Networks and is governed by a separate license or terms.
+
+-------------------------------------------------------------------------------
+2. OWNERSHIP AND RESERVATION OF RIGHTS
+-------------------------------------------------------------------------------
+
+2.1 The Software is licensed, not sold.
+
+2.2 Except for Third-Party Material and copyright in original Contributions
+owned by their respective contributors, Cache Networks retains all right,
+title, and interest in and to the Software, including all copyright and other
+intellectual-property rights.
+
+2.3 No rights are granted by implication, estoppel, exhaustion beyond what
+applicable law requires, or otherwise. All rights not expressly granted by this
+License are reserved.
+
+2.4 Making source code publicly accessible does not waive copyright, dedicate
+the Software to the public domain, or create an unrestricted permission to copy
+or redistribute it.
+
+-------------------------------------------------------------------------------
+3. LIMITED PERSONAL-USE LICENSE GRANT
+-------------------------------------------------------------------------------
+
+Subject to Your continuing compliance with this License, Cache Networks grants
+You a limited, revocable, non-exclusive, non-transferable, non-sublicensable,
+royalty-free license to:
+
+a. view and inspect the Software;
+b. download the Software;
+c. run the Software for Personal Use;
+d. privately modify the Software for Personal Use;
+e. create reasonable private backups for permitted use;
+f. study the Software for educational and technical understanding; and
+g. perform private testing, debugging, benchmarking, and evaluation.
+
+This Section does not authorise Commercial Use, Organisational Use,
+Redistribution, rebranding, sublicensing, or operation of a Hosted Service.
+
+-------------------------------------------------------------------------------
+4. COMMUNITY FORKS EXPRESSLY PERMITTED
+-------------------------------------------------------------------------------
+
+4.1 Cache Networks expressly permits Community Forks on GitHub for genuine
+community-development purposes.
+
+4.2 Permitted Community Fork activities include:
+
+a. preparing bug fixes;
+b. preparing features and enhancements;
+c. refactoring code;
+d. improving performance or reliability;
+e. adding or improving tests;
+f. improving documentation;
+g. reproducing bugs;
+h. investigating reported issues;
+i. conducting code review;
+j. demonstrating proposed changes;
+k. collaborating with other CDNPanel contributors;
+l. submitting pull requests;
+m. maintaining an in-progress branch for a proposed contribution; and
+n. other good-faith development activity intended to improve CDNPanel.
+
+4.3 A Community Fork may be public where GitHub's normal fork workflow makes
+the fork public.
+
+4.4 Every Community Fork must:
+
+a. remain linked to or clearly identify the Official Repository as its origin;
+b. retain this LICENSE file in full;
+c. retain existing copyright and attribution notices;
+d. clearly state that it is an unofficial development fork if there is any
+   reasonable possibility of confusion;
+e. avoid branding that suggests endorsement or official status unless Cache
+   Networks has given written permission;
+f. be used primarily for contribution, review, testing, discussion, or related
+   community-development purposes; and
+g. comply with every other restriction in this License.
+
+4.5 A Community Fork must NOT be used to:
+
+a. launch an independent CDNPanel distribution;
+b. publish independent releases for end users;
+c. operate a competing project;
+d. create a rebranded CDNPanel product;
+e. sell or monetise CDNPanel;
+f. operate a Hosted Service for third parties;
+g. publish prebuilt binaries, packages, or container images as an independent
+   distribution;
+h. create a general-purpose mirror or alternative download source;
+i. remove or weaken this License; or
+j. evade any restriction of this License.
+
+4.6 The Community Fork permission is an exception to the general
+Redistribution restriction only to the minimum extent reasonably necessary for
+GitHub-based contribution and community review.
+
+-------------------------------------------------------------------------------
+5. CONTRIBUTIONS TO CDNPANEL
+-------------------------------------------------------------------------------
+
+5.1 You may submit Contributions to Cache Networks through pull requests,
+patches, issues, discussions, or another contribution channel accepted by
+Cache Networks.
+
+5.2 By intentionally submitting a Contribution, You represent and warrant that:
+
+a. You created the Contribution or otherwise have sufficient rights to submit
+   it under these terms;
+b. Your Contribution does not knowingly infringe another person's copyright,
+   patent, trademark, trade secret, confidentiality obligation, or other right;
+c. You are not knowingly submitting code that You are prohibited from
+   contributing by an employer, client, contract, NDA, or other obligation;
+d. any Third-Party Material included in the Contribution is clearly identified
+   and compatible with its proposed use in CDNPanel; and
+e. You have disclosed any license notice that must remain with the Contribution.
+
+5.3 You retain copyright ownership in Your original Contribution unless You
+separately assign that ownership in writing.
+
+5.4 By submitting a Contribution for possible inclusion in CDNPanel, You grant
+Cache Networks a perpetual, worldwide, irrevocable, non-exclusive,
+transferable, sublicensable, royalty-free license to:
+
+a. use;
+b. reproduce;
+c. modify;
+d. adapt;
+e. translate;
+f. create derivative works from;
+g. publish;
+h. publicly display;
+i. publicly perform;
+j. distribute;
+k. make available;
+l. sublicense;
+m. relicense; and
+n. otherwise exploit
+
+the Contribution, in whole or in part, in connection with CDNPanel and related
+Cache Networks projects, products, releases, documentation, hosted offerings,
+services, commercial offerings, or successor works.
+
+5.5 The contribution grant in Section 5.4 is intentionally broad so Cache
+Networks can continue maintaining, distributing, licensing, commercialising,
+or relicensing CDNPanel in the future without obtaining separate permission
+for every release.
+
+5.6 Submitting a Contribution does not guarantee that it will be accepted,
+merged, credited in a particular format, maintained indefinitely, or included
+in any release.
+
+-------------------------------------------------------------------------------
+6. ATTRIBUTION FOR COPIED OR DERIVED CODE
+-------------------------------------------------------------------------------
+
+6.1 If You copy or adapt a Covered Excerpt into another project under any
+permission granted by Cache Networks, You must preserve attribution.
+
+6.2 At minimum, the relevant source file or an accompanying attribution file
+must contain a notice substantially equivalent to:
 
     Contains code derived from CDNPanel by Cache Networks.
     Original project: https://github.com/cachenetworks/CDNPanel
+    Licensed under the Cache Networks Source-Available Personal &
+    Community Contribution License.
 
-You must also retain any copyright and license notices that were present in the
-copied or derived material.
+6.3 Existing copyright, license, and authorship notices in copied material must
+not be removed, obscured, falsified, or replaced.
 
-Attribution does not by itself grant permission to redistribute the Software.
-If your separate project will be published, shared, sold, hosted for third
-parties, or otherwise distributed, you must first obtain written permission
-from Cache Networks unless the use falls entirely within the community-fork
-exception in Section 2.
+6.4 If a Covered Excerpt is copied into multiple files, attribution may be
+provided in each relevant file or in a clearly discoverable NOTICE or
+ATTRIBUTION file that identifies the affected material.
 
-6. NO COMMERCIAL OR ORGANISATIONAL USE
+6.5 Attribution is required for copied or adapted copyrightable expression even
+where the Covered Excerpt is modified, renamed, reformatted, translated to
+another programming language, reorganised, or combined with other code.
 
-Commercial use, business use, organisational use, customer-facing use, paid
-hosting, resale, monetisation, or use primarily intended to generate revenue is
-not permitted without prior written permission from Cache Networks.
+6.6 Attribution does NOT itself grant permission to Redistribute or use the
+Software commercially. Attribution and permission are separate requirements.
 
-This restriction does not prevent an individual contributor from using a
-community fork solely to prepare or submit a contribution to CDNPanel.
+6.7 Nothing in this License claims ownership over independently created code,
+ideas, facts, algorithms, methods, interfaces, or material that applicable law
+does not protect as Cache Networks copyright.
 
-7. NO RELICENSING OR CLAIM OF OWNERSHIP
+-------------------------------------------------------------------------------
+7. GENERAL PROHIBITION ON REDISTRIBUTION
+-------------------------------------------------------------------------------
 
-You may not:
+Except for Community Fork activity expressly permitted by Section 4, or
+separate written permission from Cache Networks, You may not Redistribute the
+Software.
 
-a. claim that you created or own the original Software or any copied portion;
-b. remove or replace Cache Networks attribution in copied or derived material;
-c. place the original Software or copied portions under a different license in
-   a way that suggests you have authority to relicense Cache Networks' work; or
-d. represent a modified copy as an official Cache Networks product.
+Without limitation, You may not:
 
-Section 3 does not restrict Cache Networks from relicensing Contributions
-submitted for inclusion in CDNPanel.
+a. publish the Software in another repository;
+b. mirror the Official Repository outside the permitted Community Fork model;
+c. upload copies to file-sharing or download sites;
+d. publish source archives;
+e. publish modified source archives;
+f. publish binaries or installers;
+g. publish Docker or OCI images;
+h. publish packages to npm, PyPI, crates.io, NuGet, Maven, package managers, or
+   similar registries;
+i. bundle the Software into another distributed product;
+j. distribute a white-label or rebranded version;
+k. provide the Software to customers or clients;
+l. sublicense the Software;
+m. sell copies of the Software;
+n. distribute the Software as part of paid support, consulting, or hosting;
+o. provide an independent update channel; or
+p. use a Community Fork as a disguised independent distribution.
 
-8. THIRD-PARTY COMPONENTS
+-------------------------------------------------------------------------------
+8. NO COMMERCIAL USE WITHOUT WRITTEN PERMISSION
+-------------------------------------------------------------------------------
 
-The Software may depend on or include third-party software, libraries, assets,
-or components. Those items remain subject to their own applicable licenses.
-Nothing in this License limits rights that a third-party license independently
-grants you to third-party material.
+8.1 Commercial Use is prohibited unless Cache Networks gives prior written
+permission or provides a separate commercial license.
 
-9. OWNERSHIP
+8.2 Prohibited Commercial Use includes, without limitation:
 
-The Software is licensed, not sold. Cache Networks retains all right, title,
-interest, copyright, and other intellectual property rights in the Software
-except for third-party material and original Contributions owned by their
-respective contributors.
+a. selling access to the Software;
+b. charging setup or license fees for the Software;
+c. charging customers to host or operate the Software;
+d. using the Software to provide a paid CDN, storage, file-delivery, or hosting
+   service;
+e. reselling the Software;
+f. incorporating the Software into a commercial product offered to customers;
+g. monetising a rebranded or modified version;
+h. operating an advertising-supported public service based primarily on the
+   Software;
+i. using the Software as a material part of a revenue-generating managed
+   service; or
+j. offering paid access to a Hosted Service powered by the Software.
 
-No trademark, brand, logo, trade name, or other branding rights are granted by
+8.3 Incidental use of ordinary developer tools, internet service, cloud
+resources, or hardware that cost money does not by itself convert otherwise
+permitted Personal Use into Commercial Use.
+
+-------------------------------------------------------------------------------
+9. NO ORGANISATIONAL USE WITHOUT WRITTEN PERMISSION
+-------------------------------------------------------------------------------
+
+9.1 Organisational Use is prohibited unless Cache Networks gives prior written
+permission or provides a separate license.
+
+9.2 Examples include deployment by or for:
+
+a. companies;
+b. employers;
+c. customers or clients;
+d. incorporated associations;
+e. government organisations;
+f. schools or universities;
+g. clubs or communities operating a shared production service;
+h. non-profit organisations;
+i. hosting providers; or
+j. managed-service providers.
+
+9.3 An individual may still use an employer-owned or organisation-owned
+computer solely to prepare a Community Fork contribution where that use is
+lawful, authorised by the owner of the computer, and not itself an
+Organisational deployment of CDNPanel.
+
+-------------------------------------------------------------------------------
+10. HOSTED SERVICES AND NETWORK ACCESS
+-------------------------------------------------------------------------------
+
+10.1 You may run CDNPanel privately for Personal Use.
+
+10.2 You may not offer CDNPanel, a Modification, or a substantially similar
+Derivative Work as a Hosted Service for third parties without written
+permission.
+
+10.3 Prohibited Hosted Service activity includes providing accounts, tenants,
+API keys, storage, uploads, file delivery, administration, or other CDNPanel
+functionality to customers, clients, organisations, or the general public.
+
+10.4 A temporary development deployment reasonably necessary to demonstrate a
+Contribution to Cache Networks is permitted where access is limited to project
+reviewers and the deployment is not marketed, monetised, or operated as an
+independent service.
+
+-------------------------------------------------------------------------------
+11. MODIFICATIONS AND PRIVATE DERIVATIVE WORKS
+-------------------------------------------------------------------------------
+
+11.1 You may create Modifications for Personal Use.
+
+11.2 You may keep private branches or private copies containing Modifications.
+
+11.3 You may not publish or Redistribute a Modification except through a
+permitted Community Fork workflow or with written permission.
+
+11.4 A Modification remains subject to this License to the extent it contains
+or derives from the Software.
+
+11.5 Rewriting, porting, translating, reorganising, or refactoring copied
+copyrightable expression does not remove the attribution or licensing
+obligations merely because the result looks different.
+
+11.6 Independent implementations created without copying protected expression
+are not automatically governed by this License merely because they implement
+similar functionality.
+
+-------------------------------------------------------------------------------
+12. BINARIES, CONTAINERS, PACKAGES, BUILDS, AND RELEASE ARTIFACTS
+-------------------------------------------------------------------------------
+
+12.1 You may privately build binaries, bundles, packages, or container images
+for permitted Personal Use or contribution testing.
+
+12.2 You may not publicly publish or Redistribute those artifacts except where
+Cache Networks has given written permission.
+
+12.3 Official binaries, packages, releases, containers, and deployment images
+published by Cache Networks remain governed by this License unless a different
+license is expressly attached to the specific artifact.
+
+-------------------------------------------------------------------------------
+13. COPYING INTO OTHER PROJECTS
+-------------------------------------------------------------------------------
+
+13.1 You may not use CDNPanel as a source-code library for another distributed
+project unless Cache Networks grants written permission.
+
+13.2 Where written permission allows a Covered Excerpt to be used in another
+project, the attribution requirements in Section 6 apply unless the written
+permission expressly says otherwise.
+
+13.3 Copying a Covered Excerpt and then making cosmetic edits, renaming
+variables, changing formatting, changing language syntax, or splitting the
+code across files does not eliminate the attribution obligation.
+
+13.4 This License does not prohibit independent development or prohibit use of
+general knowledge gained from reading the Software where no protected
+expression is copied.
+
+-------------------------------------------------------------------------------
+14. NO RELICENSING BY LICENSEES
+-------------------------------------------------------------------------------
+
+14.1 Except for Cache Networks exercising rights granted under Section 5, You
+may not relicense the Software or any Covered Excerpt.
+
+14.2 You may not attach MIT, Apache, GPL, AGPL, BSD, MPL, proprietary, public
+domain, Creative Commons, or any other terms to Cache Networks code in a way
+that purports to replace, override, or weaken this License.
+
+14.3 You may license code that You independently create under terms of Your
+choice, provided that doing so does not purport to grant rights in Cache
+Networks material that You do not possess.
+
+-------------------------------------------------------------------------------
+15. BRANDING, NAMES, LOGOS, AND TRADEMARKS
+-------------------------------------------------------------------------------
+
+15.1 This License does not grant any right to use the names "Cache Networks",
+"CDNPanel", associated logos, visual identity, domain names, or other branding
+as a trademark, service mark, business name, product identity, or endorsement.
+
+15.2 A Community Fork may use the name "CDNPanel" only as reasonably necessary
+to identify its upstream origin, for example:
+
+    "Unofficial fork of CDNPanel by Cache Networks"
+
+15.3 You may not imply sponsorship, endorsement, partnership, certification, or
+official status without written permission.
+
+-------------------------------------------------------------------------------
+16. SECURITY RESEARCH
+-------------------------------------------------------------------------------
+
+16.1 This License does not prohibit good-faith review of the Software for
+security vulnerabilities.
+
+16.2 Security findings should be reported responsibly to Cache Networks rather
+than weaponised through a misleading fork or redistributed malicious build.
+
+16.3 This Section grants no permission to attack, access, disrupt, or test
+systems You do not own or have explicit authorisation to test.
+
+-------------------------------------------------------------------------------
+17. THIRD-PARTY MATERIAL AND DEPENDENCIES
+-------------------------------------------------------------------------------
+
+17.1 Third-Party Material is governed by its own applicable license or terms.
+
+17.2 Nothing in this License reduces, replaces, or expands rights independently
+granted by a third-party license.
+
+17.3 Where the repository contains a dependency merely referenced through a
+package manager, that dependency does not become subject to this License solely
+because CDNPanel depends on it.
+
+17.4 You remain responsible for complying with all applicable third-party
+licenses when building or using the Software.
+
+-------------------------------------------------------------------------------
+18. GITHUB AND PLATFORM-SPECIFIC RIGHTS
+-------------------------------------------------------------------------------
+
+18.1 The Official Repository is hosted on GitHub. GitHub's own Terms of Service
+may grant platform-specific rights necessary for users to view and fork public
+repositories through GitHub's functionality.
+
+18.2 Nothing in this License is intended to revoke rights that GitHub itself
+must provide under its Terms of Service for operation of the GitHub platform.
+
+18.3 Any platform-specific right granted by GitHub does not create a broader
+license from Cache Networks to:
+
+a. commercialise the Software;
+b. relicense the Software;
+c. create an independent distribution;
+d. operate a Hosted Service;
+e. remove attribution; or
+f. use Cache Networks branding.
+
+18.4 If another hosting platform provides similar technical fork functionality,
+that functionality does not create rights beyond those expressly granted by
 this License.
 
-10. TERMINATION
+-------------------------------------------------------------------------------
+19. COPYRIGHT AND ATTRIBUTION NOTICES
+-------------------------------------------------------------------------------
 
-Your rights under this License terminate automatically if you breach any term
-of this License.
+19.1 You must retain this License with every permitted copy where reasonably
+practicable.
 
-Upon termination, you must stop using the Software and delete all copies in
-your possession or control, except where retention is required by applicable
-law or where GitHub retains repository data under its own terms.
+19.2 You must not remove copyright headers or notices from files unless Cache
+Networks has expressly authorised their removal.
 
-Termination does not limit any rights or remedies available to Cache Networks
-for a prior breach.
+19.3 You must not add false authorship or ownership claims to Cache Networks
+material.
 
-11. PERMISSION FOR OTHER USES
+19.4 You may accurately identify Your own authorship of Your original
+Contribution or Modification.
 
-Any use not expressly permitted by this License requires prior written
+-------------------------------------------------------------------------------
+20. NO PATENT, TRADEMARK, OR OTHER IMPLIED LICENSE
+-------------------------------------------------------------------------------
+
+20.1 No patent license is granted except to the minimum extent, if any,
+necessarily implied by applicable law to exercise an express copyright
+permission granted in this License.
+
+20.2 No trademark license is granted.
+
+20.3 No right to confidential information, trade secrets, designs, branding,
+domain names, or publicity rights is granted.
+
+-------------------------------------------------------------------------------
+21. COMPLIANCE WITH LAW
+-------------------------------------------------------------------------------
+
+You may use the Software only in compliance with applicable law and may not use
+the Software in a way that requires Cache Networks to violate applicable law or
+the rights of another person.
+
+-------------------------------------------------------------------------------
+22. REQUESTING ADDITIONAL PERMISSION
+-------------------------------------------------------------------------------
+
+22.1 Uses not expressly permitted by this License require prior written
 permission from Cache Networks.
 
-Cache Networks may grant separate commercial, redistribution, hosting, or other
-licenses on different terms at its sole discretion.
+22.2 Cache Networks may, at its sole discretion, grant:
 
-12. DISCLAIMER OF WARRANTY
+a. commercial licenses;
+b. organisational-use licenses;
+c. redistribution permissions;
+d. hosted-service permissions;
+e. OEM or white-label rights;
+f. educational or non-profit exceptions; or
+g. other permissions
 
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY
-KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.
+under separate terms.
 
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, CACHE NETWORKS WILL NOT BE LIABLE FOR
-ANY CLAIM, LOSS, DAMAGE, LIABILITY, DATA LOSS, SERVICE INTERRUPTION, OR OTHER
-CONSEQUENCE ARISING FROM OR RELATED TO THE SOFTWARE OR ITS USE.
+22.3 A separate written permission may waive or modify specific provisions of
+this License only for the person and use stated in that permission.
 
-13. SEVERABILITY
+-------------------------------------------------------------------------------
+23. TERMINATION
+-------------------------------------------------------------------------------
 
-If any provision of this License is found unenforceable, the remaining
-provisions will continue in effect to the maximum extent permitted by law.
+23.1 Your rights under this License terminate automatically if You materially
+breach this License.
 
-14. ENTIRE LICENSE
+23.2 Upon termination, You must cease all use for which this License is
+required and, where legally and technically possible, remove or delete
+unauthorised copies and distributions under Your control.
 
-This License states the permissions granted by Cache Networks for the Software.
-All rights not expressly granted are reserved.
+23.3 Cache Networks may require You to remove an unauthorised repository,
+package, download, hosted deployment, or other distribution.
 
-By using, copying, modifying, forking, or contributing to the Software, you
-agree to comply with this License.
+23.4 Termination does not affect:
+
+a. rights and remedies arising from a breach before termination;
+b. Cache Networks' ownership rights;
+c. the Contribution license already granted under Section 5, which is
+   irrevocable; or
+d. provisions that by their nature should survive termination.
+
+23.5 Sections concerning ownership, Contributions, attribution, restrictions,
+disclaimers, liability, and interpretation survive termination to the extent
+applicable.
+
+-------------------------------------------------------------------------------
+24. ENFORCEMENT AND REMEDIES
+-------------------------------------------------------------------------------
+
+24.1 Cache Networks reserves all remedies available under applicable law for
+copyright infringement, breach of license conditions, passing off, trademark
+misuse, breach of contract where applicable, or other unlawful conduct.
+
+24.2 Failure to enforce a provision on one occasion does not waive the right to
+enforce that provision or another provision later.
+
+24.3 Permission given to one person does not automatically grant the same
+permission to another person.
+
+24.4 A delay in requesting removal of an unauthorised copy does not convert the
+copy into an authorised distribution.
+
+-------------------------------------------------------------------------------
+25. DISCLAIMER OF WARRANTY
+-------------------------------------------------------------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
+"AS IS" AND "AS AVAILABLE", WITH ALL FAULTS AND WITHOUT WARRANTY OF ANY KIND.
+
+CACHE NETWORKS DISCLAIMS ALL EXPRESS, IMPLIED, STATUTORY, AND OTHER WARRANTIES,
+INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+TITLE, QUIET ENJOYMENT, ACCURACY, SECURITY, AVAILABILITY, NON-INFRINGEMENT, AND
+THAT THE SOFTWARE WILL BE ERROR-FREE OR SUITABLE FOR ANY PARTICULAR DEPLOYMENT.
+
+YOU ARE RESPONSIBLE FOR REVIEWING, CONFIGURING, SECURING, BACKING UP, AND
+OPERATING THE SOFTWARE.
+
+-------------------------------------------------------------------------------
+26. LIMITATION OF LIABILITY
+-------------------------------------------------------------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, CACHE NETWORKS AND ITS
+CONTRIBUTORS WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES, OR FOR LOSS OF DATA, PROFITS,
+REVENUE, GOODWILL, BUSINESS, SECURITY, AVAILABILITY, OR SERVICE, ARISING FROM OR
+RELATING TO THE SOFTWARE OR THIS LICENSE, WHETHER BASED IN CONTRACT, TORT,
+NEGLIGENCE, STRICT LIABILITY, OR ANOTHER THEORY, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+WHERE LIABILITY CANNOT LAWFULLY BE EXCLUDED, IT IS LIMITED TO THE MAXIMUM
+EXTENT PERMITTED BY APPLICABLE LAW.
+
+-------------------------------------------------------------------------------
+27. NO SUPPORT OBLIGATION
+-------------------------------------------------------------------------------
+
+This License does not require Cache Networks or any contributor to provide
+support, maintenance, updates, security patches, hosting, documentation,
+migration assistance, compatibility, or continued availability of the
+Software.
+
+-------------------------------------------------------------------------------
+28. CHANGES TO FUTURE VERSIONS
+-------------------------------------------------------------------------------
+
+28.1 Cache Networks may publish future versions of CDNPanel under a revised
+license.
+
+28.2 A later license version does not retroactively remove permissions already
+granted for a copy that Cache Networks previously distributed under an earlier
+license, except where applicable law or the earlier license itself provides
+otherwise.
+
+28.3 New releases may state that they are governed by a newer version of this
+License.
+
+-------------------------------------------------------------------------------
+29. SEVERABILITY
+-------------------------------------------------------------------------------
+
+If any provision of this License is held invalid, illegal, or unenforceable,
+that provision will be interpreted or limited to the minimum extent necessary
+to make it enforceable where permitted, and the remaining provisions will
+continue in effect.
+
+-------------------------------------------------------------------------------
+30. NO WAIVER
+-------------------------------------------------------------------------------
+
+No failure or delay by Cache Networks in exercising a right or remedy operates
+as a waiver of that or any other right or remedy.
+
+-------------------------------------------------------------------------------
+31. ENTIRE LICENSE AND ORDER OF PRECEDENCE
+-------------------------------------------------------------------------------
+
+31.1 This License states the default permissions granted by Cache Networks for
+the Software.
+
+31.2 If Cache Networks gives You a separate written license or permission that
+expressly conflicts with this License, the separate written terms control for
+that expressly authorised use.
+
+31.3 Third-Party Material remains controlled by its own applicable terms.
+
+-------------------------------------------------------------------------------
+32. INTERPRETATION
+-------------------------------------------------------------------------------
+
+32.1 Headings are for convenience and do not limit the meaning of a provision.
+
+32.2 "Including" means "including without limitation".
+
+32.3 A reference to written permission includes an electronically signed
+agreement or other written authorisation that can reasonably be authenticated
+as coming from Cache Networks.
+
+32.4 This License should not be interpreted to claim rights that applicable law
+does not allow Cache Networks to claim.
+
+-------------------------------------------------------------------------------
+33. QUICK PERMISSION MATRIX
+-------------------------------------------------------------------------------
+
+The following summary is provided for convenience only. If it conflicts with
+the detailed terms above, the detailed terms control.
+
+Activity                                                   Permission
+---------------------------------------------------------  --------------------
+View and inspect source                                    ALLOWED
+Download for personal use                                  ALLOWED
+Run privately for personal, non-commercial use             ALLOWED
+Modify privately for personal use                          ALLOWED
+Create private backups                                     ALLOWED
+Fork on GitHub to help CDNPanel development                ALLOWED
+Submit pull requests                                       ALLOWED
+Public Community Fork used for contribution work           ALLOWED
+Publish an independent CDNPanel release                    NOT ALLOWED
+Mirror the repository as a separate download source        NOT ALLOWED
+Publish binaries, packages, or container images            NOT ALLOWED
+Rebrand CDNPanel as Your own product                       NOT ALLOWED
+Sell CDNPanel or a modified version                        NOT ALLOWED
+Run CDNPanel as a paid service                             NOT ALLOWED
+Run CDNPanel for a business or organisation                NOT ALLOWED
+Copy protected code into another distributed project      PERMISSION REQUIRED
+Copy permitted code without required attribution           NOT ALLOWED
+Claim authorship of Cache Networks code                    NOT ALLOWED
+Remove this License from a permitted fork                  NOT ALLOWED
+Use a Community Fork to prepare improvements               ALLOWED
+Use Cache Networks branding as Your own                    NOT ALLOWED
+Request a separate commercial/redistribution license       ALLOWED
+
+-------------------------------------------------------------------------------
+34. ATTRIBUTION TEMPLATE
+-------------------------------------------------------------------------------
+
+Where attribution is required by Section 6, the following form is recommended:
+
+    Contains code derived from CDNPanel by Cache Networks.
+    Copyright (c) 2026 Cache Networks.
+    Original project: https://github.com/cachenetworks/CDNPanel
+    Used under the Cache Networks Source-Available Personal &
+    Community Contribution License.
+
+-------------------------------------------------------------------------------
+35. FINAL STATEMENT
+-------------------------------------------------------------------------------
+
+The purpose of this License is to keep CDNPanel openly viewable and welcoming
+to community contribution while preventing unauthorised redistribution,
+commercial exploitation, rebranding, hosted resale, and appropriation of Cache
+Networks' work.
+
+If You want to improve CDNPanel, fork it, experiment, submit issues, and send
+pull requests.
+
+If You want to redistribute it, commercialise it, host it for third parties,
+rebrand it, incorporate protected code into another distributed project, or
+obtain broader rights, You must first obtain permission from Cache Networks.
