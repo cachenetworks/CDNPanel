@@ -371,17 +371,25 @@ Organisational deployment of CDNPanel.
 10. HOSTED SERVICES AND NETWORK ACCESS
 -------------------------------------------------------------------------------
 
-10.1 You may run CDNPanel privately for Personal Use.
+10.1 You may run CDNPanel for Personal Use, including operating a personal,
+non-commercial instance that delivers files belonging to or controlled by You.
 
-10.2 You may not offer CDNPanel, a Modification, or a substantially similar
+10.2 Public visitors retrieving files from Your own personal, non-commercial
+project does not, by itself, turn that deployment into a prohibited Hosted
+Service, provided You are not providing third parties with CDNPanel accounts,
+tenants, storage allocations, upload capability, API access, administrative
+access, managed CDN services, or a comparable service offering.
+
+10.3 You may not offer CDNPanel, a Modification, or a substantially similar
 Derivative Work as a Hosted Service for third parties without written
 permission.
 
-10.3 Prohibited Hosted Service activity includes providing accounts, tenants,
-API keys, storage, uploads, file delivery, administration, or other CDNPanel
-functionality to customers, clients, organisations, or the general public.
+10.4 Prohibited Hosted Service activity includes providing accounts, tenants,
+API keys, storage allocations, uploads, file-management functionality,
+administration, managed CDN functionality, or other CDNPanel service features
+to customers, clients, organisations, or the general public.
 
-10.4 A temporary development deployment reasonably necessary to demonstrate a
+10.5 A temporary development deployment reasonably necessary to demonstrate a
 Contribution to Cache Networks is permitted where access is limited to project
 reviewers and the deployment is not marketed, monetised, or operated as an
 independent service.
