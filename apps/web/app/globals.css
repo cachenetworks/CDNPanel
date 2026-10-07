@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --subtle: 240 5% 98%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 42%;
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 6% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 4%;
+    --border: 240 6% 90%;
+    --input: 240 6% 86%;
+    --ring: 221 83% 53%;
+    --primary: 221 83% 50%;
+    --primary-foreground: 0 0% 100%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 64% 36%;
+    --warning: 35 92% 45%;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --series-3: #1baf7a;
+    --chart-grid: #e7e6e3;
+    color-scheme: light;
+  }
+  .dark {
+    --background: 240 8% 6%;
+    --foreground: 0 0% 96%;
+    --subtle: 240 7% 8%;
+    --muted: 240 5% 13%;
+    --muted-foreground: 240 5% 63%;
+    --accent: 240 5% 15%;
+    --accent-foreground: 0 0% 96%;
+    --popover: 240 7% 9%;
+    --popover-foreground: 0 0% 96%;
+    --border: 240 5% 17%;
+    --input: 240 5% 22%;
+    --ring: 217 91% 60%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 240 10% 4%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 60% 45%;
+    --warning: 38 92% 55%;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --chart-grid: #2a2a2e;
+    color-scheme: dark;
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-1 ring-offset-background;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

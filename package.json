@@ -1,0 +1,40 @@
+{
+  "name": "cdnserver",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Self-hosted CDN and file delivery platform",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "dev": "npm run build -w @cdn/shared -w @cdn/storage && concurrently -n api,worker,web -c blue,magenta,green \"npm run dev -w @cdn/api\" \"npm run dev:worker -w @cdn/api\" \"npm run dev -w @cdn/web\"",
+    "build": "npm run db:generate && npm run build -w @cdn/shared -w @cdn/storage -w @cdn/database && npm run build -w @cdn/api && npm run build -w @cdn/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "db:generate": "prisma generate --schema packages/database/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema packages/database/prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --schema packages/database/prisma/schema.prisma",
+    "db:seed": "npm run build -w @cdn/shared -w @cdn/database && npm run seed -w @cdn/database",
+    "create-admin": "npm run create-admin -w @cdn/api"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.12.0",
+    "@types/node": "^22.7.0",
+    "concurrently": "^9.0.1",
+    "eslint": "^9.12.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.11.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.9.0",
+    "vitest": "^2.1.3",
+    "prisma": "^5.22.0"
+  }
+}
