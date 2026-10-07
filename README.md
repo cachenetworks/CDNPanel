@@ -923,7 +923,7 @@ Licensed under the Cache Networks Source-Available Personal &
 Community Contribution License.
 ```
 
-Read the complete [LICENSE](LICENSE) before relying on any permission.
+Read the complete [LICENSE](LICENSE) before relying on any permission. For a plain-English explanation of common scenarios, see [LICENSING.md](LICENSING.md). The repository also includes a [NOTICE](NOTICE) summarising ownership and licensing.
 
 > [!NOTE]
 > The license is intentionally restrictive about redistribution and commercial use while remaining friendly to genuine community contribution.
