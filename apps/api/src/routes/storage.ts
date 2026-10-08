@@ -19,6 +19,7 @@ import {
   type ProviderConfig,
 } from '../lib/storageRegistry.js';
 import { getSettings } from '../lib/settings.js';
+import { providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
 
 const providerParams = z.object({ id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') });
 
@@ -69,9 +70,8 @@ async function providerSummaries() {
   return Promise.all(
     providers.map(async (p) => {
       const u = usage.find((x) => x.storageProviderId === p.id);
-      const cap = await driverFor(p)
-        .capacity()
-        .catch(() => ({ available: null, total: null }));
+      const used = Number(u?._sum.size ?? 0);
+      const cap = await providerSpace(p, used);
       return {
         id: p.id,
         object: 'storage_provider' as const,
@@ -80,9 +80,14 @@ async function providerSummaries() {
         is_default: p.isDefault,
         enabled: p.enabled,
         public_info: p.publicInfo,
-        capacity: p.capacity ? Number(p.capacity) : cap.total,
+        capacity: cap.capacity,
         available: cap.available,
-        used: Number(u?._sum.size ?? 0),
+        disk_total: cap.disk_total,
+        disk_free: cap.disk_free,
+        disk_used: cap.disk_used,
+        disk_other_used_estimate: cap.disk_other_used_estimate,
+        configured_capacity: cap.configured_capacity,
+        used,
         file_count: u?._count._all ?? 0,
         region: p.region,
         serves_countries: p.servesCountries,
@@ -120,11 +125,20 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
         providerSummaries(),
       ]);
       const def = providers.find((p) => p.is_default);
+      const used = Number(agg._sum.size ?? 0);
+      const quotaRemaining = settings.uploads.quotaBytes === null ? null : Math.max(0, settings.uploads.quotaBytes - used);
+      const available = smallestKnownLimit(quotaRemaining, def?.available);
       return {
-        used: Number(agg._sum.size ?? 0),
+        used,
         quota: settings.uploads.quotaBytes,
-        available: settings.uploads.quotaBytes !== null ? Math.max(0, settings.uploads.quotaBytes - Number(agg._sum.size ?? 0)) : (def?.available ?? null),
-        capacity: settings.uploads.quotaBytes ?? def?.capacity ?? null,
+        available,
+        // Effective CDN ceiling from current usage + headroom. A disk might
+        // already contain unrelated data, so its full size is not CDN capacity.
+        capacity: available === null ? null : used + available,
+        disk_total: def?.disk_total ?? null,
+        disk_free: def?.disk_free ?? null,
+        disk_used: def?.disk_used ?? null,
+        disk_other_used_estimate: def?.disk_other_used_estimate ?? null,
         file_count: agg._count._all,
         average_file_size: Math.round(Number(agg._avg.size ?? 0)),
         largest_files: largest.map(serializeFile),

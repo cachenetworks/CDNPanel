@@ -17,6 +17,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build -w @cdn/shared && npm run build -w @cdn/web
 
 FROM node:22-bookworm-slim AS runtime
+# Pick up Debian security fixes newer than the base image.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build --chown=node:node /app/apps/web/.next/standalone ./
