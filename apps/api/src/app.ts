@@ -101,11 +101,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.addHook('onResponse', async (req, reply) => {
     const ms = Number(process.hrtime.bigint() - req.startedAt) / 1e6;
+    const transferCompleted = !req.raw.aborted && reply.raw.writableFinished;
     if (isDeliveryPath(req.url)) activeTransfers.dec({ direction: 'out' });
     else if (req.method === 'POST' && (req.url.startsWith('/api/v1/files') || req.url.startsWith('/api/v1/uploads'))) activeTransfers.dec({ direction: 'in' });
     const kind = req.analytics?.kind ?? (req.url.startsWith('/api/') ? 'api' : 'other');
     httpDuration.observe({ method: req.method, route: req.routeOptions.url ?? 'unmatched', status: `${Math.floor(reply.statusCode / 100)}xx`, kind }, ms / 1000);
-    if (req.analytics?.bytes) bytesSent.inc({ kind }, req.analytics.bytes);
+    if (transferCompleted && req.analytics?.bytes) bytesSent.inc({ kind }, req.analytics.bytes);
     if (req.analytics?.cacheStatus) cacheStatusTotal.inc({ status: req.analytics.cacheStatus });
     req.log.info(
       {
@@ -129,13 +130,16 @@ export async function buildApp(): Promise<FastifyInstance> {
         method: req.method,
         route: req.routeOptions.url ?? 'unmatched',
         statusCode: reply.statusCode,
-        bytesSent: reply.statusCode < 300 ? (req.analytics.bytes ?? 0) : 0,
+        bytesSent: reply.statusCode < 300 && transferCompleted ? (req.analytics.bytes ?? 0) : 0,
         responseMs: ms,
         mimeType: req.analytics.mimeType ?? null,
         ip: req.clientIp,
         country: req.country,
         userAgent: req.headers['user-agent'] ?? null,
         kind: req.analytics.kind ?? 'delivery',
+        // An interrupted transfer was attempted, but must not count as a
+        // completed file view/download or share landing.
+        trafficType: transferCompleted ? req.analytics.trafficType : undefined,
         cacheStatus: req.analytics.cacheStatus ?? null,
         zoneId: req.analytics.zoneId ?? null,
         projectId: req.analytics.projectId ?? null,

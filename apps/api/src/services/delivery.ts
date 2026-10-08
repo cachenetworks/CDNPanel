@@ -192,6 +192,7 @@ export async function sendFile(req: FastifyRequest, reply: FastifyReply, file: F
     zoneId: ctx.zone?.id ?? null,
     projectId: ctx.zone?.projectId ?? null,
     kind: opts.kind ?? 'delivery',
+    trafficType: disposition === 'attachment' ? 'download' : 'view',
   };
 
   const type = file.mimeType.startsWith('text/') || file.mimeType === 'application/json' ? `${file.mimeType}; charset=utf-8` : file.mimeType;
