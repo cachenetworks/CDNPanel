@@ -84,6 +84,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 
   migrate:
+    # Manual maintenance job; a finished one-shot container makes Dockge mark the stack "exited".
+    profiles: [maintenance]
     build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
     image: ${API_IMAGE:-ghcr.io/cachenetworks/cdnpanel-api:latest}
     environment: *app-env
@@ -97,10 +99,12 @@ services:
     image: ${API_IMAGE:-ghcr.io/cachenetworks/cdnpanel-api:latest}
     restart: unless-stopped
     environment: *app-env
+    # Apply migrations before the API accepts requests, including after restarts.
+    command: ['sh', '-ec', 'cd /app && ./node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma && cd /app/apps/api && exec node --import ./dist/otel.js dist/server.js']
     volumes:
       - cdn-data:/data
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
   worker:
@@ -116,7 +120,7 @@ services:
       test: ['CMD-SHELL', 'kill -0 1']
       interval: 30s
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      api: { condition: service_healthy }
       redis: { condition: service_healthy }
 
   web:
