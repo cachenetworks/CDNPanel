@@ -420,6 +420,11 @@ Then start the stack:
 docker compose up -d --build
 ```
 
+The API applies pending Prisma database migrations before it starts accepting traffic.
+The `migrate` service is an optional maintenance job, excluded from the normal stack so
+Dockge does not flag a successfully completed one-shot container as `exited`. To
+run migrations manually, use `docker compose run --rm migrate`.
+
 Create the initial administrator:
 
 ```bash

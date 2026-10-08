@@ -218,7 +218,12 @@ export function registerRoutes(app: FastifyInstance, defs: RouteDef<any, any, an
         const query = parseOrThrow(def.query, req.query, 'query');
         const body = def.multipart || def.rawBody ? undefined : parseOrThrow(def.body, req.body, 'body');
         const result = await def.handler({ req, reply, params, query, body: body as never, auth: req.auth });
-        if (reply.sent) return reply;
+        // A handler that returns `reply` has already called send(); onSend hooks may still be pending, so
+        // `reply.sent` can be false here — sending again would write the headers twice and crash.
+        // FastifyReply is thenable. When a client aborts a stream, awaiting a handler
+        // that returned reply can resolve to undefined while `reply.sent` is false.
+        // Never try to send a second response on that already closed socket.
+        if (reply.sent || reply.raw.headersSent || reply.raw.destroyed || result === reply) return reply;
         if (result === undefined) {
           if (reply.statusCode === 200) reply.code(204);
           return reply.send();

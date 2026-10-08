@@ -58,7 +58,9 @@ type APIError struct {
 	Details   any    `json:"details,omitempty"`
 }
 
-func (e *APIError) Error() string { return fmt.Sprintf("cdnpanel: %s (%d): %s", e.Code, e.Status, e.Message) }
+func (e *APIError) Error() string {
+	return fmt.Sprintf("cdnpanel: %s (%d): %s", e.Code, e.Status, e.Message)
+}
 
 // Multipart describes a multipart upload: Fields are sent before the file, as the API requires.
 type Multipart struct {
