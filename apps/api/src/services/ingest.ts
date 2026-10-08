@@ -26,6 +26,7 @@ import { zoneForFolder, type ZoneWithRelations } from '../lib/zones.js';
 import { assertUploadQuota } from './usage.js';
 import { purgeVariants } from './images.js';
 import { autoPurgeFiles } from './purge.js';
+import { providerSpace } from './storageCapacity.js';
 
 /** Pass-through stream that hashes, counts and captures the first bytes for sniffing. */
 class Inspector extends Transform {
@@ -177,6 +178,14 @@ export async function storeUpload(input: {
   const driver = driverFor(provider);
   const storageKey = objectKeyForFile(input.objectId);
 
+  // Check the destination filesystem, not just the CDN's logical quota. A full
+  // host volume can have plenty of apparent CDN quota remaining.
+  const usedOnProvider = await prisma.file.aggregate({ where: { storageProviderId: provider.id }, _sum: { size: true } });
+  const free = (await providerSpace(provider, Number(usedOnProvider._sum.size ?? 0))).available;
+  if (free !== null && (free <= 0 || (input.declaredSize !== undefined && input.declaredSize > free))) {
+    throw new AppError('quota_exceeded', 'The storage backend does not have enough available capacity.');
+  }
+
   const inspector = new Inspector(input.maxSize);
   input.stream.on('error', (err) => inspector.destroy(err));
   // Errors are surfaced through the storage pipeline; avoid a duplicate unhandled 'error' event.
@@ -220,6 +229,14 @@ export async function storeUpload(input: {
 
   try {
     if (settings.uploads.quotaBytes !== null && (await storageUsed()) + size > settings.uploads.quotaBytes) throw new AppError('quota_exceeded');
+    // Multipart and streamed uploads may not declare their size. Check the
+    // provider's logical quota after counting the actual bytes, too. The
+    // host free-space figure is not checked here because writing the object
+    // has already reduced it.
+    if (provider.capacity !== null) {
+      const usage = await prisma.file.aggregate({ where: { storageProviderId: provider.id }, _sum: { size: true } });
+      if (Number(usage._sum.size ?? 0) + size > Number(provider.capacity)) throw new AppError('quota_exceeded');
+    }
     await assertUploadQuota(input.zone, input.apiKeyId, size);
   } catch (err) {
     await cleanupNew();

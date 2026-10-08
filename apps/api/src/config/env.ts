@@ -103,6 +103,11 @@ const EnvSchema = z
     /** OTLP/HTTP traces endpoint, e.g. http://otel-collector:4318/v1/traces. Tracing is off when empty. */
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
     SERVICE_NAME: z.string().default('cdn-api'),
+    /** Optional OpenAI-compatible advisory backend, e.g. a private FreeLLMAPI gateway. */
+    AI_BASE_URL: z.preprocess((value) => typeof value === 'string' && value.trim() === '' ? undefined : value, urlNoSlash.optional()),
+    AI_API_KEY: z.string().optional(),
+    AI_MODEL: z.string().trim().max(120).optional(),
+    AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(30000).default(12000),
   })
   .superRefine((env, ctx) => {
     if (env.STORAGE_DRIVER !== 'LOCAL') {
