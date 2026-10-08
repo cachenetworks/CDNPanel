@@ -33,7 +33,11 @@ function filterSql(f: Filter): Prisma.Sql {
   return parts.length ? Prisma.join(parts, ' ') : Prisma.empty;
 }
 
-const DOWNLOAD_COND = Prisma.sql`("kind" IN ('delivery', 'share') AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start'))`;
+// Historical rows have no trafficType; their disposition cannot be recovered safely.
+const SUCCESSFUL_INTERACTION = Prisma.sql`("method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start'))`;
+const DOWNLOAD_COND = Prisma.sql`("trafficType" = 'download' AND ${SUCCESSFUL_INTERACTION})`;
+const VIEW_COND = Prisma.sql`("trafficType" = 'view' AND ${SUCCESSFUL_INTERACTION})`;
+const CLICK_COND = Prisma.sql`("trafficType" = 'click' AND "method" = 'GET' AND "statusCode" = 200)`;
 
 type Row = Record<string, unknown>;
 
@@ -50,6 +54,8 @@ export async function timeSeries(range: Range, filter: Filter = {}) {
     SELECT date_trunc(${range.unit}, "timestamp") AS bucket,
            count(*) AS requests,
            count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads,
+           count(*) FILTER (WHERE ${VIEW_COND}) AS views,
+           count(*) FILTER (WHERE ${CLICK_COND}) AS clicks,
            coalesce(sum("bytesSent"), 0) AS bytes,
            count(*) FILTER (WHERE "statusCode" >= 400) AS errors,
            count(*) FILTER (WHERE "cacheStatus" IN ('revalidated', 'variant-hit')) AS cache_hits,
@@ -71,22 +77,22 @@ export async function timeSeries(range: Range, filter: Filter = {}) {
         })
       : [];
 
-  const map = new Map<number, { t: string; requests: number; downloads: number; bandwidth: number; errors: number; cache_hits: number; avg_ms: number; uploads: number }>();
+  const map = new Map<number, { t: string; requests: number; downloads: number; views: number; clicks: number; bandwidth: number; errors: number; cache_hits: number; avg_ms: number; uploads: number }>();
   const step = range.unit === 'hour' ? 3_600_000 : 86_400_000;
   const start = range.unit === 'hour' ? Math.floor(range.from.getTime() / step) * step : startOfDay(range.from).getTime();
   for (let t = start; t <= range.to.getTime(); t += step) {
-    map.set(t, { t: new Date(t).toISOString(), requests: 0, downloads: 0, bandwidth: 0, errors: 0, cache_hits: 0, avg_ms: 0, uploads: 0 });
+    map.set(t, { t: new Date(t).toISOString(), requests: 0, downloads: 0, views: 0, clicks: 0, bandwidth: 0, errors: 0, cache_hits: 0, avg_ms: 0, uploads: 0 });
   }
   for (const r of rows) {
     const key = (r.bucket as Date).getTime();
     const e = map.get(key);
     if (!e) continue;
-    Object.assign(e, { requests: num(r.requests), downloads: num(r.downloads), bandwidth: num(r.bytes), errors: num(r.errors), cache_hits: num(r.cache_hits), avg_ms: Math.round(num(r.avg_ms) * 10) / 10 });
+    Object.assign(e, { requests: num(r.requests), downloads: num(r.downloads), views: num(r.views), clicks: num(r.clicks), bandwidth: num(r.bytes), errors: num(r.errors), cache_hits: num(r.cache_hits), avg_ms: Math.round(num(r.avg_ms) * 10) / 10 });
   }
   for (const r of rollups) {
     const e = map.get(r.date.getTime());
     if (e && e.requests === 0) {
-      Object.assign(e, { requests: num(r.requests), downloads: num(r.downloads), bandwidth: num(r.bytes), errors: num(r.errors), avg_ms: r.avgMs });
+      Object.assign(e, { requests: num(r.requests), downloads: num(r.downloads), views: num(r.views), clicks: num(r.clicks), bandwidth: num(r.bytes), errors: num(r.errors), avg_ms: r.avgMs });
     }
   }
   for (const r of uploads) {
@@ -104,6 +110,8 @@ export async function totals(range: Range, filter: Filter = {}) {
   const [r] = await getPrisma().$queryRaw<Row[]>`
     SELECT count(*) AS requests,
            count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads,
+           count(*) FILTER (WHERE ${VIEW_COND}) AS views,
+           count(*) FILTER (WHERE ${CLICK_COND}) AS clicks,
            coalesce(sum("bytesSent"), 0) AS bytes,
            count(*) FILTER (WHERE "statusCode" >= 400) AS errors,
            count(*) FILTER (WHERE "kind" = 'api' AND "statusCode" >= 400) AS api_errors,
@@ -117,6 +125,8 @@ export async function totals(range: Range, filter: Filter = {}) {
   return {
     requests: num(r?.requests),
     downloads: num(r?.downloads),
+    views: num(r?.views),
+    clicks: num(r?.clicks),
     bandwidth: num(r?.bytes),
     errors: num(r?.errors),
     api_errors: num(r?.api_errors),
@@ -134,7 +144,7 @@ export async function breakdowns(range: Range, filter: Filter = {}) {
     prisma.$queryRaw<Row[]>`SELECT "statusCode" AS code, count(*) AS count FROM "FileRequest" WHERE ${where} GROUP BY "statusCode" ORDER BY count DESC LIMIT 20`,
     prisma.$queryRaw<Row[]>`SELECT coalesce("country", 'Unknown') AS country, count(*) AS requests, coalesce(sum("bytesSent"),0) AS bytes FROM "FileRequest" WHERE ${where} GROUP BY 1 ORDER BY requests DESC LIMIT 15`,
     prisma.$queryRaw<Row[]>`SELECT coalesce("mimeType", 'n/a') AS mime, count(*) AS requests, coalesce(sum("bytesSent"),0) AS bytes FROM "FileRequest" WHERE ${where} AND "kind" <> 'api' GROUP BY 1 ORDER BY bytes DESC LIMIT 15`,
-    prisma.$queryRaw<Row[]>`SELECT r."fileId" AS id, f."name" AS name, count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads, count(*) AS requests, coalesce(sum(r."bytesSent"),0) AS bytes
+    prisma.$queryRaw<Row[]>`SELECT r."fileId" AS id, f."name" AS name, count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads, count(*) FILTER (WHERE ${VIEW_COND}) AS views, count(*) FILTER (WHERE ${CLICK_COND}) AS clicks, count(*) AS requests, coalesce(sum(r."bytesSent"),0) AS bytes
       FROM "FileRequest" r JOIN "File" f ON f."id" = r."fileId" WHERE r."timestamp" >= ${utc(range.from)} AND r."timestamp" <= ${utc(range.to)} ${filterSql(filter)}
       GROUP BY r."fileId", f."name" ORDER BY bytes DESC LIMIT 10`,
     prisma.$queryRaw<Row[]>`SELECT r."apiKeyId" AS id, k."name" AS name, k."prefix" AS prefix, count(*) AS requests, count(*) FILTER (WHERE r."statusCode" >= 400) AS errors, coalesce(sum(r."bytesSent"),0) AS bytes
@@ -148,7 +158,7 @@ export async function breakdowns(range: Range, filter: Filter = {}) {
     status_codes: statusCodes.map((r) => ({ code: num(r.code), count: num(r.count) })),
     countries: countries.map((r) => ({ country: String(r.country), requests: num(r.requests), bandwidth: num(r.bytes) })),
     mime_types: mimes.map((r) => ({ mime_type: String(r.mime), requests: num(r.requests), bandwidth: num(r.bytes) })),
-    top_files: topFiles.map((r) => ({ id: String(r.id), name: String(r.name), downloads: num(r.downloads), requests: num(r.requests), bandwidth: num(r.bytes) })),
+    top_files: topFiles.map((r) => ({ id: String(r.id), name: String(r.name), downloads: num(r.downloads), views: num(r.views), clicks: num(r.clicks), requests: num(r.requests), bandwidth: num(r.bytes) })),
     top_api_keys: topKeys.map((r) => ({ id: String(r.id), name: String(r.name), prefix: String(r.prefix), requests: num(r.requests), errors: num(r.errors), bandwidth: num(r.bytes) })),
     top_folders: topFolders.map((r) => ({ id: r.id ? String(r.id) : null, path: String(r.path), requests: num(r.requests), bandwidth: num(r.bytes) })),
   };

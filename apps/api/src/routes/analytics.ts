@@ -4,8 +4,9 @@ import { defineRoute, type RouteDef } from '../http/route.js';
 import { breakdowns, bandwidthSince, recentErrors, resolveRange, timeSeries, totals } from '../services/analytics.js';
 import { requireFile } from '../services/files.js';
 import { storageUsed } from '../services/ingest.js';
-import { driverFor, ensureDefaultProvider } from '../lib/storageRegistry.js';
+import { ensureDefaultProvider } from '../lib/storageRegistry.js';
 import { getSettings } from '../lib/settings.js';
+import { providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
 import { serializeFile, FILE_INCLUDE } from '../lib/serialize.js';
 
 const rangeQuery = z.object({
@@ -15,8 +16,8 @@ const rangeQuery = z.object({
   api_key_id: z.string().max(64).optional().describe('Restrict to requests made with this API key'),
 });
 
-const TOTALS_EXAMPLE = { requests: 15230, downloads: 9120, bandwidth: 73400320000, errors: 41, api_errors: 12, cache_hits: 2210, cache_hit_ratio: 0.18, avg_response_ms: 12.4, p95_response_ms: 48.2 };
-const SERIES_EXAMPLE = [{ t: '2026-01-01T00:00:00.000Z', requests: 812, downloads: 400, bandwidth: 3221225472, errors: 2, cache_hits: 120, avg_ms: 11.2, uploads: 14 }];
+const TOTALS_EXAMPLE = { requests: 15230, downloads: 9120, views: 2140, clicks: 360, bandwidth: 73400320000, errors: 41, api_errors: 12, cache_hits: 2210, cache_hit_ratio: 0.18, avg_response_ms: 12.4, p95_response_ms: 48.2 };
+const SERIES_EXAMPLE = [{ t: '2026-01-01T00:00:00.000Z', requests: 812, downloads: 400, views: 160, clicks: 32, bandwidth: 3221225472, errors: 2, cache_hits: 120, avg_ms: 11.2, uploads: 14 }];
 
 function startOfUtcDay(d = new Date()) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -120,10 +121,9 @@ export const analyticsRoutes: RouteDef<any, any, any>[] = [
       const provider = await ensureDefaultProvider();
       const canSeeFiles = req.auth?.type === 'session' && req.auth.permissions.has('files.view');
       const canSeeLogs = req.auth?.type === 'session' && req.auth.permissions.has('logs.view');
-      const [fileCount, used, capacity, uploadsToday, todayTotals, monthBw, todayBw, activeKeys, series, b, recentUploads, activity] = await Promise.all([
+      const [fileCount, used, uploadsToday, todayTotals, monthBw, todayBw, activeKeys, series, b, recentUploads, activity] = await Promise.all([
         prisma.file.count(),
         storageUsed(),
-        driverFor(provider).capacity().catch(() => ({ available: null, total: null })),
         prisma.file.count({ where: { createdAt: { gte: today } } }),
         totals(todayRange),
         bandwidthSince(startOfUtcMonth()),
@@ -134,16 +134,26 @@ export const analyticsRoutes: RouteDef<any, any, any>[] = [
         canSeeFiles ? prisma.file.findMany({ orderBy: { createdAt: 'desc' }, take: 8, include: FILE_INCLUDE }) : Promise.resolve([]),
         canSeeLogs ? prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 10 }) : Promise.resolve([]),
       ]);
-      const capacityBytes = settings.uploads.quotaBytes ?? (provider.capacity ? Number(provider.capacity) : capacity.total);
+      const providerUsage = await prisma.file.aggregate({ where: { storageProviderId: provider.id }, _sum: { size: true } });
+      const capacity = await providerSpace(provider, Number(providerUsage._sum.size ?? 0));
+      const quotaHeadroom = settings.uploads.quotaBytes === null ? null : Math.max(0, settings.uploads.quotaBytes - used);
+      const available = smallestKnownLimit(quotaHeadroom, capacity.available);
+      const capacityBytes = available === null ? null : used + available;
       return {
         range: { from: range.from.toISOString(), to: range.to.toISOString(), unit: range.unit },
         stats: {
           total_files: fileCount,
           storage_used: used,
           storage_capacity: capacityBytes,
-          storage_available: capacity.available,
+          storage_available: available,
+          disk_total: capacity.disk_total,
+          disk_used: capacity.disk_used,
+          disk_free: capacity.disk_free,
+          disk_other_used_estimate: capacity.disk_other_used_estimate,
           uploads_today: uploadsToday,
           downloads_today: todayTotals.downloads,
+          views_today: todayTotals.views,
+          clicks_today: todayTotals.clicks,
           requests_today: todayTotals.requests,
           bandwidth_today: todayBw,
           bandwidth_month: monthBw,
