@@ -2,11 +2,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { api, type Paginated } from '@/lib/api';
+import { api, errorMessage, type Paginated } from '@/lib/api';
 import type { ApiKeyDTO, SeriesPoint } from '@/lib/types';
 import { formatBytes, formatDate, formatNumber } from '@/lib/utils';
 import { useSession } from '@/lib/session';
 import { NativeSelect } from '@/components/ui/form';
+import { Button } from '@/components/ui/button';
 import { DeliveryMap, countryName, type GeoData } from '@/components/analytics/delivery-map';
 import { Badge, EmptyState, ErrorState, PageHeader, Panel, Section, Skeleton } from '@/components/ui/misc';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
@@ -14,7 +15,7 @@ import { PeriodPicker, RankedBars, StatusCodeChart, TimeChart, periodQuery, type
 
 interface Analytics {
   range: { unit: 'hour' | 'day' };
-  totals: { requests: number; downloads: number; bandwidth: number; errors: number; cache_hits: number; cache_hit_ratio: number; avg_response_ms: number; p95_response_ms: number };
+  totals: { requests: number; downloads: number; views: number; clicks: number; bandwidth: number; errors: number; cache_hits: number; cache_hit_ratio: number; avg_response_ms: number; p95_response_ms: number };
   series: SeriesPoint[];
   breakdowns: {
     status_codes: { code: number; count: number }[];
@@ -27,11 +28,23 @@ interface Analytics {
   recent_errors: { timestamp: string; method: string; route: string; status: number; file_id: string | null; api_key_id: string | null; ip: string | null; kind: string }[];
 }
 
+interface AiCheckResult {
+  enabled: boolean;
+  advisory?: string | null;
+  period?: string;
+  privacy?: string;
+  message?: string;
+}
+
 export default function AnalyticsPage() {
   const { can } = useSession();
   const [period, setPeriod] = React.useState<PeriodValue>({ period: '7d' });
   const [keyId, setKeyId] = React.useState('');
+  const [aiBusy, setAiBusy] = React.useState(false);
+  const [aiResult, setAiResult] = React.useState<AiCheckResult | null>(null);
+  const [aiError, setAiError] = React.useState<string | null>(null);
   const keys = useQuery({ queryKey: ['api-keys', 'all'], queryFn: () => api<Paginated<ApiKeyDTO>>('/api-keys', { query: { limit: 200 } }), enabled: can('api_keys.view') });
+  const aiAvailability = useQuery({ queryKey: ['ai-advisory-availability'], queryFn: () => api<AiCheckResult>('/analytics/ai-check'), enabled: can('analytics.view') });
   const q = useQuery({ queryKey: ['analytics', period, keyId], queryFn: () => api<Analytics>('/analytics', { query: { ...periodQuery(period), api_key_id: keyId || undefined } }) });
   const d = q.data;
   const hourly = d?.range.unit === 'hour';
@@ -40,6 +53,8 @@ export default function AnalyticsPage() {
     ? [
         ['Requests', formatNumber(d.totals.requests)],
         ['Downloads', formatNumber(d.totals.downloads)],
+        ['Inline views', formatNumber(d.totals.views)],
+        ['Share clicks', formatNumber(d.totals.clicks)],
         ['Bandwidth', formatBytes(d.totals.bandwidth)],
         ['Errors', formatNumber(d.totals.errors)],
         ['Cache revalidations', `${formatNumber(d.totals.cache_hits)} (${(d.totals.cache_hit_ratio * 100).toFixed(1)}%)`],
@@ -51,7 +66,7 @@ export default function AnalyticsPage() {
     <>
       <PageHeader
         title="Analytics"
-        description="CDN delivery and API traffic. Times are bucketed in UTC."
+        description="Downloads: attachment transfers; views: inline file responses; clicks: share-link landings. Requests also include API traffic. Older ambiguous events are excluded from these counts. Times are UTC."
         actions={
           <>
             {can('api_keys.view') && (
@@ -69,8 +84,8 @@ export default function AnalyticsPage() {
         }
       />
       {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
-      <div className="mb-8 grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-3 xl:grid-cols-6">
-        {(d ? totals : Array.from({ length: 6 }, () => ['', ''] as [string, string])).map(([k, v], i) => (
+      <div className="mb-8 grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4 xl:grid-cols-8">
+        {(d ? totals : Array.from({ length: 8 }, () => ['', ''] as [string, string])).map(([k, v], i) => (
           <div key={i} className="px-4 py-3">
             {d ? (
               <>
@@ -84,6 +99,41 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      {can('analytics.view') && (
+        <Section title="AI operations check" description="Optional human-reviewed insights from the last 24 hours of aggregate metrics.">
+          <Panel className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                {aiAvailability.isLoading ? 'Checking AI availability…' : aiAvailability.isError ? 'Could not check AI configuration.' : aiAvailability.data?.enabled ? 'AI advisory is available.' : 'Configure AI_BASE_URL and AI_MODEL on the API server to enable this feature.'}
+              </p>
+              <Button
+                size="sm"
+                loading={aiBusy}
+                disabled={!aiAvailability.data?.enabled}
+                onClick={async () => {
+                  setAiBusy(true);
+                  setAiError(null);
+                  setAiResult(null);
+                  try {
+                    setAiResult(await api<AiCheckResult>('/analytics/ai-check', { method: 'POST' }));
+                  } catch (err) {
+                    setAiError(errorMessage(err));
+                  } finally {
+                    setAiBusy(false);
+                  }
+                }}
+              >
+                Run AI check
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Only aggregate counts and storage measurements are sent to your configured AI provider when you click Run. No IPs, filenames, request bodies or file contents are sent. Advice does not change CDN settings.</p>
+            {aiError && <p role="alert" className="text-sm text-destructive">{aiError}</p>}
+            {aiResult?.message && <p role="status" className="text-sm text-muted-foreground">{aiResult.message}</p>}
+            {aiResult?.advisory && <div role="status" className="whitespace-pre-wrap rounded-md border bg-muted/30 p-4 text-sm leading-relaxed">{aiResult.advisory}</div>}
+          </Panel>
+        </Section>
+      )}
+
       <GeoSection period={period.period === '24h' || period.period === '7d' || period.period === '30d' ? period.period : '30d'} />
       <Section title="Over time">
         {!d ? (
@@ -93,6 +143,8 @@ export default function AnalyticsPage() {
             <TimeChart data={d.series} metric="requests" title="Requests" hourly={hourly} />
             <TimeChart data={d.series} metric="bandwidth" title="Bandwidth" unit="bytes" hourly={hourly} />
             <TimeChart data={d.series} metric="downloads" title="Downloads" hourly={hourly} kind="bar" />
+            <TimeChart data={d.series} metric="views" title="Inline views" hourly={hourly} kind="bar" />
+            <TimeChart data={d.series} metric="clicks" title="Share link clicks" hourly={hourly} kind="bar" />
             <TimeChart data={d.series} metric="cache_hits" title="Cache revalidations (304)" hourly={hourly} kind="bar" color="var(--series-3)" />
             <TimeChart data={d.series} metric="avg_ms" title="Average response time" unit="ms" hourly={hourly} color="var(--series-2)" />
             <TimeChart data={d.series} metric="errors" title="Errors (4xx/5xx)" hourly={hourly} kind="bar" color="hsl(var(--destructive))" />

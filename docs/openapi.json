@@ -10258,6 +10258,8 @@
                   "totals": {
                     "requests": 15230,
                     "downloads": 9120,
+                    "views": 2140,
+                    "clicks": 360,
                     "bandwidth": 73400320000,
                     "errors": 41,
                     "api_errors": 12,
@@ -10271,6 +10273,8 @@
                       "t": "2026-01-01T00:00:00.000Z",
                       "requests": 812,
                       "downloads": 400,
+                      "views": 160,
+                      "clicks": 32,
                       "bandwidth": 3221225472,
                       "errors": 2,
                       "cache_hits": 120,
@@ -10537,6 +10541,8 @@
                   "totals": {
                     "requests": 15230,
                     "downloads": 9120,
+                    "views": 2140,
+                    "clicks": 360,
                     "bandwidth": 73400320000,
                     "errors": 41,
                     "api_errors": 12,
@@ -10550,6 +10556,8 @@
                       "t": "2026-01-01T00:00:00.000Z",
                       "requests": 812,
                       "downloads": 400,
+                      "views": 160,
+                      "clicks": 32,
                       "bandwidth": 3221225472,
                       "errors": 2,
                       "cache_hits": 120,
@@ -11101,6 +11109,253 @@
             "lang": "python",
             "label": "Python",
             "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/dashboard/overview\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/ai-check": {
+      "get": {
+        "operationId": "get_api_v1_analytics_ai_check",
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Optional AI advisory availability",
+        "description": "Optional AI advisory availability",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "analytics.view"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/analytics/ai-check\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/analytics/ai-check', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/analytics/ai-check', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/analytics/ai-check\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_analytics_ai_check",
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Run a manual AI operational health review",
+        "description": "Staff only. Sends aggregate counts and storage metrics to the configured FreeLLMAPI/OpenAI-compatible backend. Advisory output cannot change CDN settings.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "analytics.view"
+        ],
+        "x-required-scopes": [],
+        "x-rate-limit": {
+          "max": 5,
+          "window_seconds": 3600
+        },
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/analytics/ai-check\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/analytics/ai-check', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/analytics/ai-check', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/analytics/ai-check\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
           }
         ]
       }

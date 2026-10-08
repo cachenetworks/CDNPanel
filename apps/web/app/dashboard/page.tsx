@@ -19,8 +19,13 @@ interface Overview {
     storage_used: number;
     storage_capacity: number | null;
     storage_available: number | null;
+    disk_total: number | null;
+    disk_free: number | null;
+    disk_used: number | null;
     uploads_today: number;
     downloads_today: number;
+    views_today: number;
+    clicks_today: number;
     requests_today: number;
     bandwidth_today: number;
     bandwidth_month: number;
@@ -67,7 +72,6 @@ export default function OverviewPage() {
 
   const d = q.data;
   const hourly = d?.range.unit === 'hour';
-  const capacityPct = d?.stats.storage_capacity ? Math.min(100, (d.stats.storage_used / d.stats.storage_capacity) * 100) : null;
 
   return (
     <>
@@ -85,10 +89,12 @@ export default function OverviewPage() {
           : (
             <>
               <Stat label="Total files" value={formatNumber(d.stats.total_files)} />
-              <Stat label="Storage used" value={formatBytes(d.stats.storage_used)} sub={capacityPct !== null ? `${capacityPct.toFixed(1)}% of ${formatBytes(d.stats.storage_capacity)}` : 'No capacity limit'} />
-              <Stat label="Storage capacity" value={d.stats.storage_capacity ? formatBytes(d.stats.storage_capacity) : '—'} sub={d.stats.storage_available !== null ? `${formatBytes(d.stats.storage_available)} free on disk` : undefined} />
+              <Stat label="CDN storage used" value={formatBytes(d.stats.storage_used)} sub="CDN-managed files across all providers" />
+              <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.disk_free !== null ? `${formatBytes(d.stats.disk_free)} host disk free` : 'Provider has not reported physical free space'} />
               <Stat label="Uploads today" value={formatNumber(d.stats.uploads_today)} />
               <Stat label="Downloads today" value={formatNumber(d.stats.downloads_today)} />
+              <Stat label="File views today" value={formatNumber(d.stats.views_today)} />
+              <Stat label="Share clicks today" value={formatNumber(d.stats.clicks_today)} />
               <Stat label="Requests today" value={formatNumber(d.stats.requests_today)} />
               <Stat label="Bandwidth today" value={formatBytes(d.stats.bandwidth_today)} />
               <Stat label="Bandwidth this month" value={formatBytes(d.stats.bandwidth_month)} />
@@ -113,6 +119,8 @@ export default function OverviewPage() {
             <TimeChart data={d.series} metric="bandwidth" title="Bandwidth" unit="bytes" hourly={hourly} />
             <TimeChart data={d.series} metric="uploads" title="Uploads" hourly={hourly} kind="bar" />
             <TimeChart data={d.series} metric="downloads" title="Downloads" hourly={hourly} kind="bar" />
+            <TimeChart data={d.series} metric="views" title="Inline views" hourly={hourly} kind="bar" />
+            <TimeChart data={d.series} metric="clicks" title="Share clicks" hourly={hourly} kind="bar" />
           </div>
         )}
       </Section>

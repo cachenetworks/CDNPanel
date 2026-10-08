@@ -8,6 +8,7 @@ import { folderRoutes } from './folders.js';
 import { uploadRoutes } from './uploads.js';
 import { apiKeyRoutes } from './apiKeys.js';
 import { analyticsRoutes } from './analytics.js';
+import { aiRoutes } from './ai.js';
 import { userRoutes } from './users.js';
 import { roleRoutes } from './roles.js';
 import { securityRoutes } from './security.js';
@@ -40,6 +41,7 @@ export const ALL_ROUTES = [
   ...folderRoutes,
   ...apiKeyRoutes,
   ...analyticsRoutes,
+  ...aiRoutes,
   ...userRoutes,
   ...roleRoutes,
   ...securityRoutes,

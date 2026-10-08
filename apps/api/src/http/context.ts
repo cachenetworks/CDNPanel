@@ -56,6 +56,7 @@ declare module 'fastify' {
       projectId?: string | null;
       /** delivery | transform | media | share */
       kind?: 'delivery' | 'transform' | 'media' | 'share';
+      trafficType?: 'download' | 'view' | 'click';
       cpuMs?: number;
     };
   }
