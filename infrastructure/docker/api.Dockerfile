@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # API + worker image (same image, different command).
-FROM node:22-bookworm-slim AS base
+FROM node:25-bookworm-slim AS base
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
