@@ -44,6 +44,11 @@ x-app-env: &app-env
   ASN_HEADER: ${ASN_HEADER:-}
   METRICS_TOKEN: ${METRICS_TOKEN:-}
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  # Optional human-reviewed, aggregate-only AI analytics advisory.
+  AI_BASE_URL: ${AI_BASE_URL:-}
+  AI_MODEL: ${AI_MODEL:-}
+  AI_API_KEY: ${AI_API_KEY:-}
+  AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-12000}
 
 services:
   postgres:
@@ -77,6 +82,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 
   migrate:
+    # Keep the one-shot migration helper out of Dockge's always-running stack.
+    profiles: [maintenance]
     image: ${API_IMAGE:-ghcr.io/cachenetworks/cdnpanel-api:latest}
     environment: *app-env
     working_dir: /app
@@ -89,10 +96,12 @@ services:
     image: ${API_IMAGE:-ghcr.io/cachenetworks/cdnpanel-api:latest}
     restart: unless-stopped
     environment: *app-env
+    # Run migrations before accepting traffic, including after container restarts.
+    command: ['sh', '-ec', 'cd /app && ./node_modules/.bin/prisma migrate deploy --schema packages/database/prisma/schema.prisma && cd /app/apps/api && exec node --import ./dist/otel.js dist/server.js']
     volumes:
       - cdn-data:/data
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
   worker:
@@ -108,7 +117,7 @@ services:
       test: ['CMD-SHELL', 'kill -0 1']
       interval: 30s
     depends_on:
-      migrate: { condition: service_completed_successfully }
+      api: { condition: service_healthy }
       redis: { condition: service_healthy }
 
   web:
