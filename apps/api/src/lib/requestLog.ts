@@ -22,6 +22,7 @@ export interface RequestRecord {
   ip?: string | null;
   userAgent?: string | null;
   kind: 'delivery' | 'api' | 'transform' | 'media' | 'share';
+  trafficType?: 'download' | 'view' | 'click';
   cacheStatus?: string | null;
   zoneId?: string | null;
   projectId?: string | null;
@@ -71,6 +72,7 @@ export async function flushRequests(): Promise<void> {
           ip: !r.ip || settings.analytics.ipStorage === 'none' ? null : settings.analytics.ipStorage === 'full' ? r.ip : anonymizeIp(r.ip),
           userAgent: settings.analytics.storeUserAgent ? (r.userAgent?.slice(0, 300) ?? null) : null,
           kind: r.kind,
+          trafficType: r.trafficType ?? null,
           cacheStatus: r.cacheStatus ?? null,
           zoneId: r.zoneId ?? null,
           projectId: r.projectId ?? null,
@@ -85,7 +87,7 @@ export async function flushRequests(): Promise<void> {
           if (r.kind === 'api' || !r.fileId || r.method === 'HEAD' || r.statusCode >= 400 || r.statusCode === 304) continue;
           const agg = perFile.get(r.fileId) ?? { downloads: 0, bytes: 0, last: r.timestamp };
           // Only count a "download" for full responses or the first range chunk.
-          agg.downloads += (r.kind === 'delivery' || r.kind === 'share') && (r.statusCode === 200 || r.cacheStatus === 'range-start') ? 1 : 0;
+          agg.downloads += r.trafficType === 'download' && r.method === 'GET' && (r.statusCode === 200 || r.cacheStatus === 'range-start') ? 1 : 0;
           agg.bytes += Number(r.bytesSent);
           if (r.timestamp > agg.last) agg.last = r.timestamp;
           perFile.set(r.fileId, agg);
