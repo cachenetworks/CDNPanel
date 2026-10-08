@@ -6,7 +6,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { NodeStorageDriver, RaidStorageDriver, StorageError } from '@cdn/storage';
+import { NodeStorageDriver, RaidStorageDriver } from '@cdn/storage';
 import { createNodeAgent } from './node-agent.js';
 
 const TOKEN = 'test-node-token-0123456789-abcdefghijklmnop';
@@ -87,6 +87,7 @@ describe('storage node agent', () => {
     await expect(pool.healthCheck()).resolves.toBeUndefined();
     const cap = await pool.capacity();
     expect(cap.total).toBeGreaterThan(0);
-    await expect(new RaidStorageDriver({ level: 'RAID0', members }).get('objects/pool/file')).rejects.toBeInstanceOf(StorageError);
+    // Files keep the layout they were written with, even if the pool is reconfigured later.
+    expect(await readAll(await new RaidStorageDriver({ level: 'RAID0', members }).get('objects/pool/file'))).toEqual(body);
   });
 });

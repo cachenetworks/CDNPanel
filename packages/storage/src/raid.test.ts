@@ -231,3 +231,71 @@ describe('replaced members', () => {
     expect(await readAll(await swapped.get('k'))).toEqual(body);
   });
 });
+
+describe('expanding a pool', () => {
+  const cases: [RaidLevel, number, RaidLevel, number][] = [
+    ['RAID0', 1, 'RAID0', 2],
+    ['RAID0', 1, 'RAID1', 2],
+    ['RAID1', 2, 'RAID5', 3],
+    ['RAID5', 3, 'RAID5', 4],
+    ['RAID5', 4, 'RAID6', 5],
+    ['RAID10', 4, 'RAID10', 6],
+  ];
+  it.each(cases)('%s × %i → %s × %i keeps old objects readable and reshapes them', async (fromLevel, fromN, toLevel, toN) => {
+    const mems = Array.from({ length: toN }, () => new MemDriver());
+    const member = (i: number) => ({ id: `node${i}`, driver: mems[i]! });
+    const before = new RaidStorageDriver({ level: fromLevel, chunkSize: 4096, members: mems.slice(0, fromN).map((_, i) => member(i)) });
+    const objects = new Map<string, Buffer>();
+    for (const size of [0, 5, 9000, 70_001]) {
+      const body = randomBytes(size);
+      objects.set(`objects/o${size}`, body);
+      await before.put(`objects/o${size}`, body, { contentType: 'application/octet-stream', size });
+    }
+
+    const after = new RaidStorageDriver({ level: toLevel, chunkSize: 4096, members: mems.map((_, i) => member(i)) });
+    // Readable straight away, on the old layout.
+    for (const [k, b] of objects) expect(await readAll(await after.get(k))).toEqual(b);
+    // New writes use the new layout immediately.
+    const fresh = randomBytes(20_000);
+    await after.put('objects/new', fresh, { contentType: 'a/b', size: fresh.length });
+    expect((await after.readManifest('objects/new'))!.members).toHaveLength(toN);
+
+    for (const k of objects.keys()) expect(await after.repair(k)).toBe('reshaped');
+    for (const k of objects.keys()) expect(await after.repair(k)).toBe('ok');
+    for (const [k, b] of objects) {
+      const m = (await after.readManifest(k))!;
+      expect(m.level).toBe(toLevel);
+      expect(m.members).toHaveLength(toN);
+      expect(await readAll(await after.get(k))).toEqual(b);
+      expect(await readAll(await after.get(k, { start: 0, end: Math.max(0, b.length - 1) }))).toEqual(b);
+    }
+    // Old shards are gone: only the reshaped shard key and the manifest remain per object.
+    const keys = new Set(mems.flatMap((d) => [...d.objects.keys()]));
+    expect([...keys].filter((k) => k.startsWith('objects/o') && !k.includes('.r') && !k.endsWith(RAID_META_SUFFIX))).toEqual([]);
+
+    // The new layout's redundancy really holds.
+    const tol = raidGeometry(toLevel, toN).tolerance;
+    if (tol > 0) {
+      mems[toN - 1]!.down = true;
+      const degraded = new RaidStorageDriver({ level: toLevel, chunkSize: 4096, members: mems.map((_, i) => member(i)) });
+      for (const [k, b] of objects) expect(await readAll(await degraded.get(k))).toEqual(b);
+      mems[toN - 1]!.down = false;
+    }
+
+    // Deleting a reshaped object removes its shards everywhere; overwriting cleans the old shard key.
+    await after.delete('objects/o5');
+    expect([...new Set(mems.flatMap((d) => [...d.objects.keys()]))].some((k) => k.startsWith('objects/o5'))).toBe(false);
+    const again = randomBytes(1234);
+    await after.put('objects/o9000', again, { contentType: 'a/b', size: again.length });
+    expect(await readAll(await after.get('objects/o9000'))).toEqual(again);
+    expect([...new Set(mems.flatMap((d) => [...d.objects.keys()]))].filter((k) => k.startsWith('objects/o9000.r') && !k.endsWith(RAID_META_SUFFIX))).toEqual([]);
+  });
+
+  it('refuses to read objects spread over more members than the pool has', async () => {
+    const mems = [new MemDriver(), new MemDriver(), new MemDriver()];
+    const wide = new RaidStorageDriver({ level: 'RAID5', chunkSize: 4096, members: mems.map((d, i) => ({ id: `n${i}`, driver: d })) });
+    await wide.put('k', randomBytes(100), { contentType: 'a/b', size: 100 });
+    const narrow = new RaidStorageDriver({ level: 'RAID1', chunkSize: 4096, members: mems.slice(0, 2).map((d, i) => ({ id: `n${i}`, driver: d })) });
+    await expect(narrow.get('k')).rejects.toThrow(/cannot shrink/);
+  });
+});

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { getPrisma, type StorageNode } from '@cdn/database';
-import { RAID_LEVELS, raidGeometry, validateRaidLayout, type RaidLevel } from '@cdn/storage';
+import { RAID_LEVELS, raidGeometry, raidUsableBytes, validateRaidLayout, type RaidLevel } from '@cdn/storage';
 import { AppError, isValidId, newId } from '@cdn/shared';
 import { defineRoute, type RouteDef } from '../http/route.js';
 import { actorOf } from '../http/context.js';
@@ -381,6 +381,53 @@ export const nodeRoutes: RouteDef<any, any, any>[] = [
       }
       await prisma.$transaction([prisma.storagePool.update({ where: { id: pool.id }, data: { name: body.name } }), prisma.storageProvider.update({ where: { id: pool.providerId }, data: { name: body.name } })]);
       await audit(actorOf(req), 'STORAGE_POOL_UPDATED', { type: 'storage_pool', id: pool.id }, { name: body.name });
+      return serializePool(pool.id);
+    },
+  }),
+  defineRoute({
+    method: 'POST',
+    url: '/api/v1/storage/pools/:id/members',
+    tag: 'Storage',
+    summary: 'Add nodes to a RAID pool',
+    description:
+      'Grows a pool with more online, unassigned nodes, optionally switching to another RAID level (e.g. a one-node pool plus a second node becomes RAID 1). New uploads use the new layout immediately; existing files stay readable and are moved onto it in the background. Requires re-authentication.',
+    auth: 'session',
+    permission: 'storage.manage',
+    requireReauth: true,
+    params: poolParams,
+    body: z.object({
+      node_ids: z.array(z.string().refine((v) => isValidId('storageNode', v), 'invalid node id')).min(1).max(31),
+      level: z.enum(['RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10']).optional(),
+    }),
+    responses: { 200: { description: 'Pool (reshape queued)' } },
+    errors: ['not_found', 'conflict', 'validation_failed'],
+    async handler({ req, params, body }) {
+      const prisma = getPrisma();
+      const pool = await loadPool(params.id);
+      const level = (body.level ?? pool.level) as RaidLevel;
+      const n = pool.members.length + body.node_ids.length;
+      const problem = validateRaidLayout(level, n);
+      if (problem) throw new AppError('validation_failed', problem);
+      // Every existing file is re-read during the reshape, so the current nodes must all be reachable.
+      if (pool.status !== 'healthy') throw new AppError('conflict', 'Bring every node in the pool back online before expanding it.');
+      if ((pool.rebuildState as RebuildState | null)?.running) throw new AppError('conflict', 'A rebuild is already running on this pool. Try again when it finishes.');
+      const added = await assertNodesAvailable(body.node_ids);
+      if (pool.members.some((m) => body.node_ids.includes(m.nodeId))) throw new AppError('validation_failed', 'That node is already in this pool.');
+      // The new layout must still hold what the pool stores today.
+      const sizes = [...pool.members.map((m) => m.node.totalBytes), ...added.map((x) => x.totalBytes)];
+      if (sizes.every((v) => v !== null)) {
+        const usable = raidUsableBytes(level, sizes.map(Number));
+        const stored = Number((await prisma.file.aggregate({ where: { storageProviderId: pool.providerId }, _sum: { size: true } }))._sum.size ?? 0);
+        if (usable < stored) throw new AppError('validation_failed', `${level} over ${n} nodes would hold ${Math.floor(usable / 1e9)} GB, less than the ${Math.ceil(stored / 1e9)} GB already stored.`);
+      }
+      await prisma.$transaction([
+        prisma.storagePoolMember.createMany({ data: added.map((node, i) => ({ id: newId('poolMember'), poolId: pool.id, nodeId: node.id, position: pool.members.length + i })) }),
+        prisma.storagePool.update({ where: { id: pool.id }, data: { level } }),
+        prisma.storageProvider.update({ where: { id: pool.providerId }, data: { publicInfo: { pool_id: pool.id, level, nodes: String(n) } } }),
+      ]);
+      await syncPoolProvider(pool.id);
+      await enqueuePoolRepair({ poolId: pool.id, reason: `expanded to ${n} nodes${level !== pool.level ? ` (${pool.level} → ${level})` : ''}` });
+      await audit(actorOf(req), 'STORAGE_POOL_EXPANDED', { type: 'storage_pool', id: pool.id }, { added: body.node_ids, from_level: pool.level, to_level: level, nodes: n });
       return serializePool(pool.id);
     },
   }),

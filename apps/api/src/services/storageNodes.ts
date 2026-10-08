@@ -196,6 +196,8 @@ export interface RebuildState {
   finished_at: string | null;
   scanned: number;
   repaired: number;
+  /** Objects moved onto the pool's current layout after an expansion. */
+  reshaped: number;
   failed: number;
   last_error: string | null;
 }
@@ -217,6 +219,7 @@ export async function runPoolRepair(poolId: string, opts: { verify?: boolean; po
     finished_at: null,
     scanned: 0,
     repaired: 0,
+    reshaped: 0,
     failed: 0,
     last_error: null,
   };
@@ -231,6 +234,7 @@ export async function runPoolRepair(poolId: string, opts: { verify?: boolean; po
         .then((r) => {
           state.scanned++;
           if (r === 'repaired') state.repaired++;
+          if (r === 'reshaped') state.reshaped++;
           if (r === 'partial') state.failed++;
         })
         .catch((err: unknown) => {

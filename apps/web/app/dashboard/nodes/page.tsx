@@ -44,6 +44,7 @@ interface Rebuild {
   finished_at: string | null;
   scanned: number;
   repaired: number;
+  reshaped?: number;
   failed: number;
   last_error: string | null;
 }
@@ -401,9 +402,107 @@ function ReplaceDialog({ target, onClose, nodes }: { target: { pool: Pool; posit
   );
 }
 
+// ─── Add nodes to a pool ─────────────────────────────────────────────────────
+
+function ExpandDialog({ pool, onClose, nodes }: { pool: Pool | null; onClose: () => void; nodes: StorageNode[] }) {
+  const qc = useQueryClient();
+  const stepUp = useStepUp();
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const [level, setLevel] = React.useState<Level>('RAID1');
+  const [busy, setBusy] = React.useState(false);
+  const free = nodes.filter((n) => n.pools.length === 0 && n.enabled && n.status === 'online');
+
+  React.useEffect(() => {
+    if (pool) {
+      setSelected([]);
+      setLevel(pool.level);
+    }
+  }, [pool]);
+  if (!pool) return null;
+
+  const n = pool.members.length + selected.length;
+  const info = LEVELS.find((l) => l.level === level)!;
+  const sizes = [...pool.members.map((m) => m.node.total_bytes), ...selected.map((id) => nodes.find((x) => x.id === id)?.total_bytes ?? null)];
+  const usable = sizes.every((v) => v !== null) ? Math.min(...(sizes as number[])) * dataNodes(level, n) : null;
+  const problem = !selected.length ? null : n < info.min ? `${info.label.split(' —')[0]} needs at least ${info.min} nodes.` : info.even && n % 2 ? 'RAID 10 needs an even number of nodes.' : usable !== null && usable < pool.stored_bytes ? 'That layout is too small for what the pool already stores.' : null;
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent size="lg">
+        <DialogHeader
+          title={`Add nodes to ${pool.name}`}
+          description="New uploads use the bigger layout straight away. Existing files stay readable and are moved onto it in the background; progress shows on the pool."
+        />
+        <DialogBody>
+          {free.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No free nodes. Add a node first (it must be online and not in another pool).</p>
+          ) : (
+            <Field label="Nodes to add" hint={level === 'RAID10' ? 'Added nodes form new mirrored pairs in the order you pick them.' : undefined}>
+              <div className="space-y-1.5">
+                {free.map((node) => {
+                  const idx = selected.indexOf(node.id);
+                  return (
+                    <label key={node.id} className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5">
+                      <input type="checkbox" checked={idx >= 0} onChange={(e) => setSelected((s) => (e.target.checked ? [...s, node.id] : s.filter((x) => x !== node.id)))} />
+                      <span className="w-10 text-xs tabular text-muted-foreground">{idx >= 0 ? `#${pool.members.length + idx + 1}` : ''}</span>
+                      <span className="flex-1 truncate text-sm">
+                        {node.name} <span className="text-xs text-muted-foreground">{node.total_bytes !== null ? formatBytes(node.total_bytes) : ''}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+          <Field label="RAID level after adding" hint="Keep the current level, or switch, e.g. a one-node pool plus a second node can become RAID 1 so every file is on both.">
+            <NativeSelect className="w-full" value={level} onChange={(e) => setLevel(e.target.value as Level)}>
+              {LEVELS.map((l) => (
+                <option key={l.level} value={l.level}>
+                  {l.label}
+                  {l.level === pool.level ? ' (current)' : ''}
+                </option>
+              ))}
+            </NativeSelect>
+          </Field>
+          <StatGrid>
+            <Stat label="Usable space" value={usable === null ? '—' : formatBytes(usable)} sub={pool.usable_bytes !== null ? `now ${formatBytes(pool.usable_bytes)}` : undefined} />
+            <Stat label="Survives" value={`${tolerance(level, n)} node failure${tolerance(level, n) === 1 ? '' : 's'}`} sub={`now ${pool.fault_tolerance}`} />
+            <Stat label="Nodes" value={n} sub={`now ${pool.members.length}`} />
+          </StatGrid>
+          {selected.length > 0 && pool.file_count > 0 && <p className="text-xs text-muted-foreground">{formatNumber(pool.file_count)} existing files ({formatBytes(pool.stored_bytes)}) will be rewritten onto the new layout. Every node in the pool must stay online while that runs.</p>}
+          {problem && <p className="text-sm text-destructive">{problem}</p>}
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            loading={busy}
+            disabled={!selected.length || Boolean(problem)}
+            onClick={() => {
+              setBusy(true);
+              void stepUp(
+                async () => {
+                  await api(`/storage/pools/${pool.id}/members`, { body: { node_ids: selected, level } });
+                  void qc.invalidateQueries({ queryKey: ['storage-nodes'] });
+                  void qc.invalidateQueries({ queryKey: ['storage'] });
+                  onClose();
+                },
+                { title: 'Confirm pool expansion', successMessage: 'Nodes added, moving existing files onto the new layout' },
+              ).finally(() => setBusy(false));
+            }}
+          >
+            Add {selected.length || ''} node{selected.length === 1 ? '' : 's'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Pool card ───────────────────────────────────────────────────────────────
 
-function PoolCard({ pool, onReplace }: { pool: Pool; onReplace: (position: number) => void }) {
+function PoolCard({ pool, onReplace, onExpand }: { pool: Pool; onReplace: (position: number) => void; onExpand: () => void }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const r = pool.rebuild;
@@ -436,6 +535,7 @@ function PoolCard({ pool, onReplace }: { pool: Pool; onReplace: (position: numbe
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
+            <DropdownMenuItem onSelect={onExpand}>Add nodes…</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void repair(false)}>Repair degraded objects</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => void repair(true)}>Full scrub (verify every shard)</DropdownMenuItem>
             {!pool.is_default && (
@@ -501,7 +601,7 @@ function PoolCard({ pool, onReplace }: { pool: Pool; onReplace: (position: numbe
             <span className="font-medium">{r.running ? (r.verify ? 'Scrubbing' : 'Rebuilding') : r.verify ? 'Last scrub' : 'Last repair'}</span>
             <span className="text-muted-foreground">({r.reason})</span>
             <span className="tabular text-muted-foreground">
-              {formatNumber(r.scanned)} checked · {formatNumber(r.repaired)} repaired{r.failed ? ` · ${formatNumber(r.failed)} failed` : ''}
+              {formatNumber(r.scanned)} checked · {formatNumber(r.repaired)} repaired{r.reshaped ? ` · ${formatNumber(r.reshaped)} moved to new layout` : ''}{r.failed ? ` · ${formatNumber(r.failed)} failed` : ''}
             </span>
             <span className="ml-auto text-xs text-muted-foreground">{new Date(r.finished_at ?? r.started_at).toLocaleString()}</span>
           </div>
@@ -562,6 +662,7 @@ export default function NodesPage() {
   const [nodeDialog, setNodeDialog] = React.useState<{ open: boolean; node: StorageNode | null }>({ open: false, node: null });
   const [poolOpen, setPoolOpen] = React.useState(false);
   const [replace, setReplace] = React.useState<{ pool: Pool; position: number } | null>(null);
+  const [expand, setExpand] = React.useState<Pool | null>(null);
   const allowed = can('storage.manage');
 
   const q = useQuery({
@@ -619,7 +720,7 @@ export default function NodesPage() {
             ) : (
               <div className="space-y-4">
                 {d.pools.map((p) => (
-                  <PoolCard key={p.id} pool={p} onReplace={(position) => setReplace({ pool: p, position })} />
+                  <PoolCard key={p.id} pool={p} onReplace={(position) => setReplace({ pool: p, position })} onExpand={() => setExpand(p)} />
                 ))}
               </div>
             )}
@@ -732,6 +833,7 @@ export default function NodesPage() {
       <NodeDialog open={nodeDialog.open} node={nodeDialog.node} onOpenChange={(o) => setNodeDialog((s) => ({ ...s, open: o }))} />
       <PoolDialog open={poolOpen} onOpenChange={setPoolOpen} nodes={d?.nodes ?? []} />
       <ReplaceDialog target={replace} onClose={() => setReplace(null)} nodes={d?.nodes ?? []} />
+      <ExpandDialog pool={expand} onClose={() => setExpand(null)} nodes={d?.nodes ?? []} />
     </>
   );
 }

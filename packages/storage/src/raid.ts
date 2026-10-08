@@ -58,9 +58,27 @@ export interface RaidManifest {
   /** Positions whose shard was not written (degraded write) and need a rebuild. */
   missing: number[];
   updatedAt: string;
+  /**
+   * Key the shards are stored under on each member (default: the object key). A reshape writes the
+   * new layout under a fresh shard key and only then switches the manifest over, so an interrupted
+   * reshape never damages the existing copy.
+   */
+  shardKey?: string;
 }
 
-export type RepairResult = 'ok' | 'repaired' | 'partial' | 'missing';
+/** The RAID layout an object was written with (it can differ from the pool's after an expansion). */
+export interface RaidLayout {
+  level: RaidLevel;
+  /** Number of members the object is spread over: positions 0..n-1 of the pool. */
+  n: number;
+  geometry: RaidGeometry;
+}
+
+export function raidLayout(level: RaidLevel, n: number): RaidLayout {
+  return { level, n, geometry: raidGeometry(level, n) };
+}
+
+export type RepairResult = 'ok' | 'repaired' | 'reshaped' | 'partial' | 'missing';
 
 export const RAID_META_SUFFIX = '.raidmeta';
 const MIN_CHUNK = 4096;
@@ -203,6 +221,8 @@ export class RaidStorageDriver implements StorageDriver {
   readonly kind = 'POOL' as const;
   readonly level: RaidLevel;
   readonly geometry: RaidGeometry;
+  /** The pool's current layout: used for every new write. */
+  readonly layout: RaidLayout;
   private readonly members: RaidMember[];
   private readonly maxChunk: number;
   /** Positions that failed recently (epoch ms until which they are skipped). */
@@ -214,6 +234,7 @@ export class RaidStorageDriver implements StorageDriver {
     this.level = config.level;
     this.members = config.members;
     this.geometry = raidGeometry(config.level, config.members.length);
+    this.layout = { level: this.level, n: config.members.length, geometry: this.geometry };
     const chunk = config.chunkSize ?? 1024 * 1024;
     if (chunk < MIN_CHUNK || chunk % MIN_CHUNK !== 0) throw new StorageError(`Chunk size must be a multiple of ${MIN_CHUNK} bytes`);
     this.maxChunk = chunk;
@@ -239,24 +260,36 @@ export class RaidStorageDriver implements StorageDriver {
     return [...all.filter((p) => !this.isDown(p)), ...all.filter((p) => this.isDown(p))];
   }
 
-  chunkFor(size?: number): number {
+  chunkFor(size?: number, layout: RaidLayout = this.layout): number {
     if (size === undefined) return this.maxChunk;
-    const per = Math.ceil(Math.max(size, 1) / this.geometry.data);
+    const per = Math.ceil(Math.max(size, 1) / layout.geometry.data);
     const rounded = Math.ceil(per / MIN_CHUNK) * MIN_CHUNK;
     return Math.min(this.maxChunk, Math.max(MIN_CHUNK, rounded));
   }
 
   /** Bytes each member stores for an object of `size` bytes with `chunk`-sized chunks. */
-  shardLength(size: number, chunk: number): number {
-    return Math.ceil(size / (chunk * this.geometry.data)) * chunk;
+  shardLength(size: number, chunk: number, layout: RaidLayout = this.layout): number {
+    return Math.ceil(size / (chunk * layout.geometry.data)) * chunk;
+  }
+
+  /** The layout recorded in a manifest. Pools only grow by appending members, so position p is still member p. */
+  layoutOf(m: RaidManifest): RaidLayout {
+    if (m.members.length > this.members.length) {
+      throw new StorageError(`Object is spread over ${m.members.length} members but the pool now has ${this.members.length}; pools cannot shrink`);
+    }
+    return raidLayout(m.level, m.members.length);
+  }
+
+  private sameLayout(a: RaidLayout, b: RaidLayout): boolean {
+    return a.level === b.level && a.n === b.n;
   }
 
   // ---------------------------------------------------------------------------------- writing
 
   /** Encodes `body` into shards written to `targets` (positions). Returns the size and failed positions. */
-  private async writeShards(key: string, body: Readable | Buffer, chunk: number, targets: number[]): Promise<{ size: number; failed: number[] }> {
-    const { data, parity } = this.geometry;
-    const n = this.members.length;
+  private async writeShards(key: string, body: Readable | Buffer, chunk: number, targets: number[], layout: RaidLayout = this.layout): Promise<{ size: number; failed: number[] }> {
+    const { data, parity } = layout.geometry;
+    const { n, level } = layout;
     type Sink = { pt: PassThrough; done: Promise<void>; failed: boolean; err?: unknown };
     const sinks = new Map<number, Sink>();
     for (const p of targets) {
@@ -298,7 +331,7 @@ export class RaidStorageDriver implements StorageDriver {
           cols.push(Q);
         }
         for (let col = 0; col < cols.length; col++) {
-          for (const p of columnMembers(this.level, n, s, col)) await write(p, cols[col]!);
+          for (const p of columnMembers(level, n, s, col)) await write(p, cols[col]!);
         }
         if (bytes.length < stripeBytes) break;
       }
@@ -329,6 +362,8 @@ export class RaidStorageDriver implements StorageDriver {
       throw new StorageError(`${offline.length} of ${n} pool members are offline; ${this.level} tolerates ${this.geometry.tolerance}`);
     }
     const targets = this.members.map((_, p) => p).filter((p) => !offline.includes(p));
+    // An overwrite of a reshaped object leaves its old shards under a separate key: remove them afterwards.
+    const previous = await this.readManifest(key).catch(() => null);
     const { size, failed } = await this.writeShards(key, body, chunk, targets);
     const missing = [...offline, ...failed].sort((a, b) => a - b);
     if (missing.length > this.geometry.tolerance) {
@@ -340,6 +375,7 @@ export class RaidStorageDriver implements StorageDriver {
       { v: 1, level: this.level, members: this.members.map((m) => m.id), chunk, size, contentType: opts.contentType, missing, updatedAt: new Date().toISOString() },
       new Set(missing),
     );
+    if (previous?.shardKey && previous.shardKey !== key) await Promise.allSettled(this.members.map((mem) => mem.driver.delete(previous.shardKey!)));
   }
 
   // ---------------------------------------------------------------------------------- reading
@@ -361,37 +397,32 @@ export class RaidStorageDriver implements StorageDriver {
 
   /** Positions whose shard for this manifest is missing or belongs to a replaced member. */
   stalePositions(m: RaidManifest): number[] {
-    return this.members.flatMap((mem, p) => (m.missing.includes(p) || m.members[p] !== mem.id ? [p] : []));
-  }
-
-  private checkLayout(m: RaidManifest): void {
-    if (m.level !== this.level || m.members.length !== this.members.length) {
-      throw new StorageError(`Object was written as ${m.level} over ${m.members.length} members; the pool is now ${this.level} over ${this.members.length}`);
-    }
+    return m.members.flatMap((id, p) => (m.missing.includes(p) || this.members[p]?.id !== id ? [p] : []));
   }
 
   async get(key: string, range?: ByteRange): Promise<Readable> {
     const m = await this.readManifest(key);
     if (!m) throw new StorageError('Object not found');
-    this.checkLayout(m);
+    this.layoutOf(m);
     if (m.size === 0) return Readable.from([]);
     const start = range?.start ?? 0;
     const end = Math.min(range?.end ?? m.size - 1, m.size - 1);
     if (start > end) return Readable.from([]);
-    return Readable.from(this.readStripes(key, m, start, end));
+    return Readable.from(this.readStripes(m.shardKey ?? key, m, start, end));
   }
 
   private async *readStripes(key: string, m: RaidManifest, start: number, end: number): AsyncGenerator<Buffer> {
-    const { data, parity } = this.geometry;
-    const n = this.members.length;
+    const { level, n, geometry } = this.layoutOf(m);
+    const { data, parity } = geometry;
     const chunk = m.chunk;
     const stripeBytes = chunk * data;
     const s0 = Math.floor(start / stripeBytes);
     const s1 = Math.floor(end / stripeBytes);
-    const dead = new Set([...this.stalePositions(m), ...this.members.flatMap((_, p) => (this.isDown(p) ? [p] : []))]);
+    const positions = Array.from({ length: n }, (_, p) => p);
+    const dead = new Set([...this.stalePositions(m), ...positions.filter((p) => this.isDown(p))]);
     const readers = new Map<number, ChunkReader>();
-    const mirrored = this.level === 'RAID1' || this.level === 'RAID10';
-    const cols = mirrored ? (this.level === 'RAID1' ? 1 : n / 2) : data + parity;
+    const mirrored = level === 'RAID1' || level === 'RAID10';
+    const cols = mirrored ? (level === 'RAID1' ? 1 : n / 2) : data + parity;
 
     const open = async (p: number, fromStripe: number): Promise<ChunkReader | null> => {
       if (dead.has(p)) return null;
@@ -422,20 +453,20 @@ export class RaidStorageDriver implements StorageDriver {
     };
 
     try {
-      if (!mirrored) await Promise.all(this.members.map((_, p) => open(p, s0)));
+      if (!mirrored) await Promise.all(positions.map((p) => open(p, s0)));
       for (let s = s0; s <= s1; s++) {
         const got: (Buffer | null)[] = [];
         for (let col = 0; col < cols; col++) {
           let buf: Buffer | null = null;
           if (mirrored) {
             // Read one copy; fall back to the mirror (opened at this stripe) if it fails.
-            for (const p of columnMembers(this.level, n, s, col)) {
+            for (const p of columnMembers(level, n, s, col)) {
               buf = await readFrom(p, s);
               if (buf) break;
             }
             if (!buf) throw new StorageError(`Every copy of column ${col} is unavailable`);
           } else {
-            buf = await readFrom(columnMembers(this.level, n, s, col)[0]!, s);
+            buf = await readFrom(columnMembers(level, n, s, col)[0]!, s);
           }
           got.push(buf);
         }
@@ -455,7 +486,9 @@ export class RaidStorageDriver implements StorageDriver {
   }
 
   async delete(key: string): Promise<void> {
-    await Promise.allSettled(this.members.flatMap((m) => [m.driver.delete(key), m.driver.delete(key + RAID_META_SUFFIX)]));
+    const m = await this.readManifest(key).catch(() => null);
+    const keys = new Set([key, key + RAID_META_SUFFIX, ...(m?.shardKey ? [m.shardKey] : [])]);
+    await Promise.allSettled(this.members.flatMap((mem) => [...keys].map((k) => mem.driver.delete(k))));
   }
 
   async copy(sourceKey: string, destKey: string): Promise<void> {
@@ -524,19 +557,22 @@ export class RaidStorageDriver implements StorageDriver {
   /**
    * Brings an object's shards back to full redundancy: rewrites shards that were skipped during a
    * degraded write or that belong to a replaced member. With `verify`, every member's shard is
-   * also checked for presence and length (a full scrub).
+   * also checked for presence and length (a full scrub). Objects written before the pool was
+   * expanded (or its level changed) are reshaped onto the current layout.
    */
   async repair(key: string, opts: { verify?: boolean; positions?: number[] } = {}): Promise<RepairResult> {
     const m = await this.readManifest(key);
     if (!m) return 'missing';
-    this.checkLayout(m);
-    const targets = new Set([...this.stalePositions(m), ...(opts.positions ?? [])]);
+    const layout = this.layoutOf(m);
+    if (!this.sameLayout(layout, this.layout)) return this.reshape(key, m);
+    const shardKey = m.shardKey ?? key;
+    const targets = new Set([...this.stalePositions(m), ...(opts.positions ?? []).filter((p) => p < layout.n)]);
     if (opts.verify) {
-      const expected = this.shardLength(m.size, m.chunk);
+      const expected = this.shardLength(m.size, m.chunk, layout);
       await Promise.all(
-        this.members.map(async (mem, p) => {
+        this.members.slice(0, layout.n).map(async (mem, p) => {
           if (targets.has(p) || this.isDown(p)) return;
-          const info = await mem.driver.head(key).catch(() => null);
+          const info = await mem.driver.head(shardKey).catch(() => null);
           if (!info || info.size !== expected) targets.add(p);
         }),
       );
@@ -545,9 +581,36 @@ export class RaidStorageDriver implements StorageDriver {
     if (!list.length) return targets.size ? 'partial' : 'ok';
     // Stale positions are excluded from reads, so the data is rebuilt from the healthy members.
     const source = await this.get(key);
-    const { failed } = await this.writeShards(key, source, m.chunk, list);
+    const { failed } = await this.writeShards(shardKey, source, m.chunk, list, layout);
     const stillMissing = [...[...targets].filter((p) => !list.includes(p)), ...failed].sort((a, b) => a - b);
-    await this.writeManifest(key, { ...m, members: this.members.map((x) => x.id), missing: stillMissing, updatedAt: new Date().toISOString() }, new Set(stillMissing));
+    await this.writeManifest(key, { ...m, members: this.members.slice(0, layout.n).map((x) => x.id), missing: stillMissing, updatedAt: new Date().toISOString() }, new Set(stillMissing));
     return stillMissing.length ? 'partial' : 'repaired';
+  }
+
+  /**
+   * Rewrites an object onto the pool's current layout (after nodes were added or the level changed).
+   * The new shards go under a fresh shard key; the manifest is switched over only once they are
+   * written, and the old shards are removed last, so a failure at any point leaves a readable copy.
+   */
+  private async reshape(key: string, m: RaidManifest): Promise<RepairResult> {
+    const offline = this.members.flatMap((_, p) => (this.isDown(p) ? [p] : []));
+    if (offline.length > this.geometry.tolerance) return 'partial';
+    const oldShardKey = m.shardKey ?? key;
+    const shardKey = `${key}.r${Date.now().toString(36)}`;
+    const chunk = this.chunkFor(m.size);
+    const targets = this.members.map((_, p) => p).filter((p) => !offline.includes(p));
+    const { failed } = await this.writeShards(shardKey, await this.get(key), chunk, targets);
+    const missing = [...offline, ...failed].sort((a, b) => a - b);
+    if (missing.length > this.geometry.tolerance) {
+      await Promise.allSettled(this.members.map((mem) => mem.driver.delete(shardKey)));
+      return 'partial';
+    }
+    await this.writeManifest(
+      key,
+      { v: 1, level: this.level, members: this.members.map((x) => x.id), chunk, size: m.size, contentType: m.contentType, missing, updatedAt: new Date().toISOString(), shardKey },
+      new Set(missing),
+    );
+    await Promise.allSettled(this.members.map((mem) => mem.driver.delete(oldShardKey)));
+    return missing.length ? 'partial' : 'reshaped';
   }
 }

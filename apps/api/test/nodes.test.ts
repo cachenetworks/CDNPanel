@@ -214,6 +214,45 @@ describe('storage nodes and RAID pools', () => {
     expect(released.statusCode).toBe(204);
   });
 
+  it('grows a one-node pool into RAID 1 and reshapes existing files onto it', async () => {
+    const a = await startAgent(10);
+    const b = await startAgent(11);
+    const ids: string[] = [];
+    for (const [i, ag] of [a, b].entries()) {
+      const res = await app.inject({ method: 'POST', url: '/api/v1/storage/nodes', headers: staff, payload: { name: `grow-${i}`, url: ag.url, token: TOKEN } });
+      expect(res.statusCode, res.body).toBe(201);
+      ids.push(res.json().id);
+    }
+    const created = await app.inject({ method: 'POST', url: '/api/v1/storage/pools', headers: staff, payload: { name: 'grow-pool', level: 'RAID0', node_ids: [ids[0]], chunk_size_kb: 64 } });
+    expect(created.statusCode, created.body).toBe(201);
+    const pool = created.json();
+    await app.inject({ method: 'PATCH', url: `/api/v1/storage/providers/${pool.provider_id}`, headers: staff, payload: { is_default: true } });
+    const files = new Map<string, Buffer>();
+    for (const size of [100, 300_000]) {
+      const body = randomBytes(size);
+      files.set(await uploadFile(`grow-${size}.bin`, body), body);
+    }
+
+    const bad = await app.inject({ method: 'POST', url: `/api/v1/storage/pools/${pool.id}/members`, headers: staff, payload: { node_ids: [ids[1]], level: 'RAID5' } });
+    expect(bad.statusCode).toBe(422);
+    const grown = await app.inject({ method: 'POST', url: `/api/v1/storage/pools/${pool.id}/members`, headers: staff, payload: { node_ids: [ids[1]], level: 'RAID1' } });
+    expect(grown.statusCode, grown.body).toBe(200);
+    expect(grown.json().level).toBe('RAID1');
+    expect(grown.json().fault_tolerance).toBe(1);
+    expect(grown.json().members).toHaveLength(2);
+    // Still readable before the reshape runs.
+    for (const [id, body] of files) expect(await download(id)).toEqual(body);
+
+    const state = await runPoolRepair(pool.id, { reason: 'test' });
+    expect(state.reshaped).toBe(files.size);
+    expect(state.failed).toBe(0);
+
+    // The original node can now go away: RAID 1 keeps every file.
+    await stopAgent(a);
+    await checkNodes();
+    for (const [id, body] of files) expect(await download(id)).toEqual(body);
+  });
+
   it('refuses to delete a pool that still holds files', async () => {
     const res = await app.inject({ method: 'DELETE', url: `/api/v1/storage/pools/${poolId}`, headers: staff });
     expect(res.statusCode).toBe(409);

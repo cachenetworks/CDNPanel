@@ -89,10 +89,25 @@ Then use it:
 * If more nodes fail than the level tolerates, the pool becomes **failed**: reads of affected files fail
   until enough nodes return. RAID 0 has no redundancy at all.
 
+## Growing a pool
+
+**Add nodes…** (pool menu) adds online, unassigned nodes to an existing pool. You can keep the RAID level
+or switch to another one that fits the new node count. Examples:
+
+* a one-node pool + a second node → **RAID 1** (every file on both) or **RAID 0** (twice the space)
+* RAID 1 with 2 nodes + a third → **RAID 5**
+* RAID 5 with 3 nodes + a fourth → RAID 5 with more space, or **RAID 6** with 5+
+* RAID 10 grows by whole pairs
+
+New uploads use the new layout immediately. Existing files stay readable on their old layout and are
+moved onto the new one in the background (the pool shows "moved to new layout" progress). Each file is
+written to its new location first and the old copy is deleted only afterwards, so an interrupted move
+never loses data — the next repair simply picks it up again. Every node must be online while the pool
+grows, and the new layout must be able to hold what the pool already stores.
+
 ## Limits
 
-* A pool's layout (level and number of nodes) is fixed when it is created. To grow, create another
-  pool and point new zones or the default at it.
+* Pools grow but never shrink: nodes can be replaced, not removed.
 * A node belongs to one pool at a time.
 * Up to 32 nodes per pool. Chunk size 256 KiB – 4 MiB (small files automatically use smaller chunks).
 
@@ -107,6 +122,7 @@ Then use it:
 | `DELETE` | `/api/v1/storage/nodes/:id` | forget a node that is not in a pool |
 | `GET` | `/api/v1/storage/pools` | pools with health, capacity, members and rebuild progress |
 | `POST` | `/api/v1/storage/pools` | create (`level`, ordered `node_ids`, `chunk_size_kb`) |
+| `POST` | `/api/v1/storage/pools/:id/members` | add nodes (`node_ids`, optional new `level`) and reshape |
 | `POST` | `/api/v1/storage/pools/:id/members/:position/replace` | swap a node and rebuild its slot |
 | `POST` | `/api/v1/storage/pools/:id/repair` | queue a repair (`verify: true` for a full scrub) |
 | `DELETE` | `/api/v1/storage/pools/:id` | delete an empty pool |
