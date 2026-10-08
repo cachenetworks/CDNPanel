@@ -22,6 +22,11 @@ interface Overview {
     disk_total: number | null;
     disk_free: number | null;
     disk_used: number | null;
+    cluster_total: number;
+    cluster_free: number;
+    cluster_used: number;
+    cluster_servers: number;
+    cluster_online_servers: number;
     uploads_today: number;
     downloads_today: number;
     views_today: number;
@@ -90,6 +95,9 @@ export default function OverviewPage() {
             <>
               <Stat label="Total files" value={formatNumber(d.stats.total_files)} />
               <Stat label="CDN storage used" value={formatBytes(d.stats.storage_used)} sub="CDN-managed files across all providers" />
+              {d.stats.cluster_servers > 1 && (
+                <Stat label="Total storage (all servers)" value={formatBytes(d.stats.cluster_total)} sub={`${formatBytes(d.stats.cluster_free)} free across ${d.stats.cluster_servers} servers${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`} />
+              )}
               <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.disk_free !== null ? `${formatBytes(d.stats.disk_free)} host disk free` : 'Provider has not reported physical free space'} />
               <Stat label="Uploads today" value={formatNumber(d.stats.uploads_today)} />
               <Stat label="Downloads today" value={formatNumber(d.stats.downloads_today)} />

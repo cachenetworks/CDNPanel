@@ -19,7 +19,7 @@ import {
   type ProviderConfig,
 } from '../lib/storageRegistry.js';
 import { getSettings } from '../lib/settings.js';
-import { providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
+import { clusterStorage, providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
 
 const providerParams = z.object({ id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') });
 
@@ -118,11 +118,12 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
     async handler() {
       const prisma = getPrisma();
       const settings = await getSettings();
-      const [agg, largest, byType, providers] = await Promise.all([
+      const [agg, largest, byType, providers, cluster] = await Promise.all([
         prisma.file.aggregate({ _sum: { size: true }, _count: { _all: true }, _avg: { size: true } }),
         prisma.file.findMany({ orderBy: { size: 'desc' }, take: 10, include: FILE_INCLUDE }),
         prisma.$queryRaw<{ type: string; count: bigint; bytes: bigint }[]>`SELECT split_part("mimeType", '/', 1) AS type, count(*) AS count, coalesce(sum("size"),0) AS bytes FROM "File" GROUP BY 1 ORDER BY bytes DESC`,
         providerSummaries(),
+        clusterStorage(),
       ]);
       const def = providers.find((p) => p.is_default);
       const used = Number(agg._sum.size ?? 0);
@@ -145,6 +146,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
         by_type: byType.map((t) => ({ type: t.type, count: Number(t.count), bytes: Number(t.bytes) })),
         providers,
         default_backend: def ? { id: def.id, name: def.name, kind: def.kind } : null,
+        cluster,
       };
     },
   }),

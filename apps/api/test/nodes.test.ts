@@ -121,6 +121,20 @@ describe('storage nodes and RAID pools', () => {
     expect(local.statusCode).toBe(422);
   });
 
+  it('counts every node in the combined storage figures', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/v1/storage', headers: staff });
+    expect(res.statusCode, res.body).toBe(200);
+    const cluster = res.json().cluster;
+    const names = cluster.servers.map((s: { name: string }) => s.name);
+    expect(names).toEqual(expect.arrayContaining(['node-0', 'node-1', 'node-2']));
+    const nodeTotal = cluster.servers.filter((s: { role: string }) => s.role === 'node').reduce((a: number, s: { total: number }) => a + s.total, 0);
+    expect(cluster.total).toBeGreaterThanOrEqual(nodeTotal);
+    const overview = await app.inject({ method: 'GET', url: '/api/v1/dashboard/overview', headers: staff });
+    expect(overview.statusCode, overview.body).toBe(200);
+    expect(overview.json().stats.cluster_total).toBe(cluster.total);
+    expect(overview.json().stats.cluster_servers).toBe(cluster.servers.length);
+  });
+
   it('validates RAID layouts', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/v1/storage/pools', headers: staff, payload: { name: 'tiny', level: 'RAID5', node_ids: nodeIds.slice(0, 2) } });
     expect(res.statusCode).toBe(422);

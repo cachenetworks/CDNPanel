@@ -6,7 +6,7 @@ import { requireFile } from '../services/files.js';
 import { storageUsed } from '../services/ingest.js';
 import { ensureDefaultProvider } from '../lib/storageRegistry.js';
 import { getSettings } from '../lib/settings.js';
-import { providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
+import { clusterStorage, providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
 import { serializeFile, FILE_INCLUDE } from '../lib/serialize.js';
 
 const rangeQuery = z.object({
@@ -135,7 +135,7 @@ export const analyticsRoutes: RouteDef<any, any, any>[] = [
         canSeeLogs ? prisma.auditLog.findMany({ orderBy: { timestamp: 'desc' }, take: 10 }) : Promise.resolve([]),
       ]);
       const providerUsage = await prisma.file.aggregate({ where: { storageProviderId: provider.id }, _sum: { size: true } });
-      const capacity = await providerSpace(provider, Number(providerUsage._sum.size ?? 0));
+      const [capacity, cluster] = await Promise.all([providerSpace(provider, Number(providerUsage._sum.size ?? 0)), clusterStorage()]);
       const quotaHeadroom = settings.uploads.quotaBytes === null ? null : Math.max(0, settings.uploads.quotaBytes - used);
       const available = smallestKnownLimit(quotaHeadroom, capacity.available);
       const capacityBytes = available === null ? null : used + available;
@@ -150,6 +150,12 @@ export const analyticsRoutes: RouteDef<any, any, any>[] = [
           disk_used: capacity.disk_used,
           disk_free: capacity.disk_free,
           disk_other_used_estimate: capacity.disk_other_used_estimate,
+          // Every server's disk combined: this server plus remote storage nodes.
+          cluster_total: cluster.total,
+          cluster_free: cluster.free,
+          cluster_used: cluster.used,
+          cluster_servers: cluster.servers.length,
+          cluster_online_servers: cluster.online_servers,
           uploads_today: uploadsToday,
           downloads_today: todayTotals.downloads,
           views_today: todayTotals.views,

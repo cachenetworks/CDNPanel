@@ -57,6 +57,13 @@ interface StorageStats {
   by_type: { type: string; count: number; bytes: number }[];
   providers: Provider[];
   default_backend: { id: string; name: string; kind: string } | null;
+  cluster: {
+    total: number;
+    free: number;
+    used: number;
+    online_servers: number;
+    servers: { name: string; role: 'main' | 'node'; status: string; total: number | null; free: number | null; used: number | null }[];
+  };
 }
 
 const KIND_HINTS: Record<Provider['kind'], string> = {
@@ -282,6 +289,37 @@ export default function StoragePage() {
               </div>
             ))}
           </div>
+          {d.cluster.servers.length > 1 && (
+            <Panel className="mb-8 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold">Combined storage across all servers</h3>
+                <span className="text-sm tabular">
+                  <span className="font-semibold">{formatBytes(d.cluster.total)}</span> total · {formatBytes(d.cluster.used)} used · {formatBytes(d.cluster.free)} free
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This server&apos;s disk plus every storage node ({d.cluster.online_servers} of {d.cluster.servers.length} online). Raw disk space: how much of it files can use depends on the RAID level of each pool — see{' '}
+                <Link href="/dashboard/nodes" className="underline">
+                  Nodes &amp; RAID
+                </Link>
+                .
+              </p>
+              <div className="mt-3 space-y-2">
+                {d.cluster.servers.map((srv) => {
+                  const pct = srv.total && srv.used !== null ? Math.min(100, (srv.used / srv.total) * 100) : 0;
+                  return (
+                    <div key={srv.name} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm">
+                      <StatusDot status={srv.status === 'online' ? 'ok' : srv.status === 'offline' ? 'fail' : 'idle'} label={<span className="truncate">{srv.name}</span>} />
+                      <div className="h-2 overflow-hidden rounded bg-muted" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${srv.name} disk usage`}>
+                        <div className={pct > 90 ? 'h-full bg-destructive' : pct > 75 ? 'h-full bg-warning' : 'h-full bg-[var(--series-1)]'} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="tabular text-xs text-muted-foreground">{srv.total === null ? 'Unknown' : `${formatBytes(srv.free ?? 0)} free of ${formatBytes(srv.total)}`}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Panel>
+          )}
           <Panel className="mb-8 p-4">
             <h3 className="text-sm font-semibold">Default backend disk usage</h3>
             <p className="mt-1 text-xs text-muted-foreground">Local disk usage includes all other server applications and files. CDN usage is logical file size; other usage is estimated. Cloud providers may not report physical capacity.</p>
