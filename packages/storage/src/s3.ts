@@ -55,6 +55,9 @@ export class S3StorageDriver implements StorageDriver {
       endpoint: config.endpoint || undefined,
       forcePathStyle: config.forcePathStyle ?? this.kind === 'MINIO',
       credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+      // The SDK adds CRC32 checksum headers to every upload by default; Backblaze B2 (and older
+      // S3-compatible servers) reject them. Only send checksums where AWS itself requires them.
+      ...(this.kind === 'S3' ? {} : { requestChecksumCalculation: 'WHEN_REQUIRED' as const, responseChecksumValidation: 'WHEN_REQUIRED' as const }),
     });
   }
 
