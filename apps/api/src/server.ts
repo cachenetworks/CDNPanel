@@ -9,6 +9,8 @@ import { closeQueues } from './lib/queue.js';
 import { stopRequestLog } from './lib/requestLog.js';
 import { flushApiKeyUsage, stopApiKeyUsageTimer } from './http/authenticate.js';
 import { ensureDefaultProvider } from './lib/storageRegistry.js';
+import { flushRuleHits } from './services/edgeSecurity.js';
+import { stopTelemetry } from './lib/telemetry.js';
 
 async function main() {
   let e;
@@ -39,9 +41,11 @@ async function main() {
       stopApiKeyUsageTimer();
       await flushApiKeyUsage();
       await stopRequestLog();
+      await flushRuleHits();
       await closeQueues();
       await closeRedis();
       await disconnectPrisma();
+      await stopTelemetry();
     } finally {
       clearTimeout(timer);
       process.exit(0);

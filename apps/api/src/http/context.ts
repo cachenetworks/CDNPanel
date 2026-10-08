@@ -30,6 +30,9 @@ export interface ApiKeyAuth {
     prefix: string;
     environment: 'LIVE' | 'TEST';
     allowedEndpoints: string[];
+    /** Keys bound to a project may only touch files inside that project's zones. */
+    projectId: string | null;
+    serviceAccountId: string | null;
   };
   scopes: Set<ApiScope>;
 }
@@ -43,7 +46,18 @@ declare module 'fastify' {
     country: string | null;
     startedAt: bigint;
     /** Set by delivery routes so analytics can attribute the request. */
-    analytics?: { fileId?: string; folderId?: string | null; mimeType?: string; bytes?: number; cacheStatus?: string };
+    analytics?: {
+      fileId?: string;
+      folderId?: string | null;
+      mimeType?: string;
+      bytes?: number;
+      cacheStatus?: string;
+      zoneId?: string | null;
+      projectId?: string | null;
+      /** delivery | transform | media | share */
+      kind?: 'delivery' | 'transform' | 'media' | 'share';
+      cpuMs?: number;
+    };
   }
 }
 

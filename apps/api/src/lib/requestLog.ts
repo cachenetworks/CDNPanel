@@ -21,8 +21,11 @@ export interface RequestRecord {
   country?: string | null;
   ip?: string | null;
   userAgent?: string | null;
-  kind: 'delivery' | 'api';
+  kind: 'delivery' | 'api' | 'transform' | 'media' | 'share';
   cacheStatus?: string | null;
+  zoneId?: string | null;
+  projectId?: string | null;
+  cpuMs?: number | null;
 }
 
 const MAX_BUFFER = 5000;
@@ -52,7 +55,7 @@ export async function flushRequests(): Promise<void> {
       const settings = await getSettings();
       if (!settings.analytics.enabled) return;
       const rows = batch
-        .filter((r) => r.kind === 'delivery' || settings.analytics.trackApiRequests)
+        .filter((r) => r.kind !== 'api' || settings.analytics.trackApiRequests)
         .map((r) => ({
           timestamp: r.timestamp,
           fileId: r.fileId ?? null,
@@ -69,6 +72,9 @@ export async function flushRequests(): Promise<void> {
           userAgent: settings.analytics.storeUserAgent ? (r.userAgent?.slice(0, 300) ?? null) : null,
           kind: r.kind,
           cacheStatus: r.cacheStatus ?? null,
+          zoneId: r.zoneId ?? null,
+          projectId: r.projectId ?? null,
+          cpuMs: r.cpuMs ?? null,
         }));
       if (rows.length > 0) {
         const prisma = getPrisma();
@@ -76,10 +82,10 @@ export async function flushRequests(): Promise<void> {
         // Maintain per-file counters for successful deliveries.
         const perFile = new Map<string, { downloads: number; bytes: number; last: Date }>();
         for (const r of rows) {
-          if (r.kind !== 'delivery' || !r.fileId || r.method === 'HEAD' || r.statusCode >= 400 || r.statusCode === 304) continue;
+          if (r.kind === 'api' || !r.fileId || r.method === 'HEAD' || r.statusCode >= 400 || r.statusCode === 304) continue;
           const agg = perFile.get(r.fileId) ?? { downloads: 0, bytes: 0, last: r.timestamp };
           // Only count a "download" for full responses or the first range chunk.
-          agg.downloads += r.statusCode === 200 || r.cacheStatus === 'range-start' ? 1 : 0;
+          agg.downloads += (r.kind === 'delivery' || r.kind === 'share') && (r.statusCode === 200 || r.cacheStatus === 'range-start') ? 1 : 0;
           agg.bytes += Number(r.bytesSent);
           if (r.timestamp > agg.last) agg.last = r.timestamp;
           perFile.set(r.fileId, agg);

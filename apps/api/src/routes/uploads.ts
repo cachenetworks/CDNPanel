@@ -11,7 +11,7 @@ import { defineRoute, type RouteDef } from '../http/route.js';
 import { actorOf, apiKeyIdOf, userIdOf } from '../http/context.js';
 import { env } from '../config/env.js';
 import { getSettings } from '../lib/settings.js';
-import { requireFolder } from '../lib/folders.js';
+import { defaultUploadFolder, requireFolder } from '../lib/folders.js';
 import { uploadProvider } from '../lib/storageRegistry.js';
 import { emitWebhookEvent } from '../lib/webhooks.js';
 import { assertUploadAllowed, ingestFile } from '../services/ingest.js';
@@ -127,9 +127,9 @@ export const uploadRoutes: RouteDef<any, any, any>[] = [
     errors: ['file_too_large', 'quota_exceeded', 'unsupported_file_type', 'folder_not_found'],
     async handler({ req, reply, body }) {
       const settings = await getSettings();
-      const { name } = await assertUploadAllowed(body.filename, body.size);
-      const folder = body.folder_id && body.folder_id !== 'root' ? await requireFolder(req, body.folder_id) : null;
-      const provider = await uploadProvider(settings.uploads.storageProviderId);
+      const folderId = body.folder_id && body.folder_id !== 'root' ? (await requireFolder(req, body.folder_id)).id : await defaultUploadFolder(req);
+      const { name, zone } = await assertUploadAllowed(body.filename, { folderId, apiKeyId: apiKeyIdOf(req), declaredSize: body.size });
+      const provider = await uploadProvider(zone?.storageProviderId ?? settings.uploads.storageProviderId);
       const chunkSize = body.chunk_size ?? settings.uploads.chunkSize;
       const totalChunks = Math.max(1, Math.ceil(body.size / chunkSize));
       if (totalChunks > 10_000) throw new AppError('validation_failed', 'Too many chunks; increase chunk_size.');
@@ -141,7 +141,7 @@ export const uploadRoutes: RouteDef<any, any, any>[] = [
           chunkSize,
           totalChunks,
           expectedSha256: body.sha256?.toLowerCase() ?? null,
-          folderId: folder?.id ?? null,
+          folderId,
           visibility: body.visibility ?? null,
           storageProviderId: provider.id,
           userId: userIdOf(req),

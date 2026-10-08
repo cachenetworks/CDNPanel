@@ -48,7 +48,65 @@ export type AuditAction =
   | 'STORAGE_PROVIDER_DELETED'
   | 'WEBHOOK_CREATED'
   | 'WEBHOOK_UPDATED'
-  | 'WEBHOOK_DELETED';
+  | 'WEBHOOK_DELETED'
+  | 'PROJECT_CREATE'
+  | 'PROJECT_UPDATE'
+  | 'PROJECT_DELETE'
+  | 'ZONE_CREATE'
+  | 'ZONE_UPDATE'
+  | 'ZONE_DELETE'
+  | 'DOMAIN_ADD'
+  | 'DOMAIN_VERIFIED'
+  | 'DOMAIN_REMOVE'
+  | 'CACHE_RULE_CREATE'
+  | 'CACHE_RULE_UPDATE'
+  | 'CACHE_RULE_DELETE'
+  | 'CACHE_PURGE'
+  | 'CACHE_PREWARM'
+  | 'FILE_TRASH'
+  | 'FILE_RESTORE'
+  | 'FILE_PURGE'
+  | 'FILE_VERSION_UPLOAD'
+  | 'FILE_VERSION_RESTORE'
+  | 'FILE_VERSION_DELETE'
+  | 'FILE_EXPIRED'
+  | 'SHARE_CREATE'
+  | 'SHARE_UPDATE'
+  | 'SHARE_REVOKE'
+  | 'LIFECYCLE_RULE_CREATE'
+  | 'LIFECYCLE_RULE_UPDATE'
+  | 'LIFECYCLE_RULE_DELETE'
+  | 'LIFECYCLE_APPLIED'
+  | 'SECURITY_RULE_CREATE'
+  | 'SECURITY_RULE_UPDATE'
+  | 'SECURITY_RULE_DELETE'
+  | 'IP_BAN_CREATE'
+  | 'IP_BAN_DELETE'
+  | 'PASSKEY_REGISTERED'
+  | 'PASSKEY_DELETED'
+  | 'SSO_PROVIDER_CREATED'
+  | 'SSO_PROVIDER_UPDATED'
+  | 'SSO_PROVIDER_DELETED'
+  | 'SSO_LINKED'
+  | 'SSO_UNLINKED'
+  | 'SSO_USER_PROVISIONED'
+  | 'SIGNED_COOKIE_ISSUED'
+  | 'QUOTA_CREATE'
+  | 'QUOTA_UPDATE'
+  | 'QUOTA_DELETE'
+  | 'SERVICE_ACCOUNT_CREATE'
+  | 'SERVICE_ACCOUNT_UPDATE'
+  | 'SERVICE_ACCOUNT_DELETE'
+  | 'API_KEY_TEMPLATE_CREATE'
+  | 'API_KEY_TEMPLATE_UPDATE'
+  | 'API_KEY_TEMPLATE_DELETE'
+  | 'API_KEY_SUSPENDED'
+  | 'API_KEY_UNSUSPENDED'
+  | 'WEBHOOK_REPLAYED'
+  | 'JOB_RETRIED'
+  | 'JOB_REMOVED'
+  | 'REPLICATION_TRIGGERED'
+  | 'MEDIA_REPROCESS';
 
 export interface AuditContext {
   actorId?: string | null;
@@ -122,7 +180,24 @@ export type SecurityEventType =
   | 'SIGNED_URL_INVALID'
   | 'MFA_FAILED'
   | 'PERMISSION_DENIED'
-  | 'MALWARE_DETECTED';
+  | 'MALWARE_DETECTED'
+  | 'IP_BANNED'
+  | 'EDGE_BLOCKED'
+  | 'API_KEY_SUSPENDED'
+  | 'API_KEY_PROJECT_DENIED'
+  | 'PASSKEY_FAILED'
+  | 'SSO_FAILED'
+  | 'SHARE_DENIED'
+  | 'QUOTA_EXCEEDED'
+  | 'TRANSFORM_SIGNATURE_INVALID';
+
+type SecurityEventListener = (type: SecurityEventType, data: { ip?: string | null; apiKeyId?: string | null }) => void;
+const listeners = new Set<SecurityEventListener>();
+
+/** Lets other modules (e.g. API-key abuse detection) react to security events without import cycles. */
+export function onSecurityEvent(fn: SecurityEventListener): void {
+  listeners.add(fn);
+}
 
 export async function securityEvent(
   type: SecurityEventType,
@@ -143,5 +218,12 @@ export async function securityEvent(
     });
   } catch (err) {
     baseLogger.error({ err, type }, 'failed to write security event');
+  }
+  for (const fn of listeners) {
+    try {
+      fn(type, data);
+    } catch (err) {
+      baseLogger.error({ err, type }, 'security event listener failed');
+    }
   }
 }

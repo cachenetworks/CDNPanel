@@ -1,10 +1,11 @@
 'use client';
 import * as React from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check } from 'lucide-react';
 import { API_SCOPES, type ApiScope } from '@cdn/shared/permissions';
 import { api, errorMessage } from '@/lib/api';
-import type { ApiKeyDTO } from '@/lib/types';
+import type { ApiKeyDTO, ProjectDTO } from '@/lib/types';
+import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from '../ui/dialog';
 import { Button } from '../ui/button';
@@ -27,9 +28,27 @@ function lines(text: string): string[] {
 }
 
 /** Wizard: name → scopes → restrictions → expiration → generate → shown once. */
-export function CreateKeyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+interface Template {
+  id: string;
+  name: string;
+  scopes: ApiScope[];
+  rate_limit: number | null;
+  ip_restrictions: string[];
+  allowed_endpoints: string[];
+  expires_in_days: number | null;
+  environment: 'live' | 'test';
+}
+
+export function CreateKeyDialog({ open, onOpenChange, defaultServiceAccount }: { open: boolean; onOpenChange: (o: boolean) => void; defaultServiceAccount?: string }) {
   const qc = useQueryClient();
+  const { can } = useSession();
   const [step, setStep] = React.useState(0);
+  const [projectId, setProjectId] = React.useState('');
+  const [serviceAccountId, setServiceAccountId] = React.useState('');
+  const [templateId, setTemplateId] = React.useState('');
+  const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<{ data: ProjectDTO[] }>('/projects'), enabled: open && can('zones.view') });
+  const accounts = useQuery({ queryKey: ['service-accounts'], queryFn: () => api<{ data: { id: string; name: string; project: { id: string } | null }[] }>('/service-accounts'), enabled: open });
+  const templates = useQuery({ queryKey: ['api-key-templates'], queryFn: () => api<{ data: Template[] }>('/api-key-templates'), enabled: open });
   const [name, setName] = React.useState('');
   const [environment, setEnvironment] = React.useState<'live' | 'test'>('live');
   const [notes, setNotes] = React.useState('');
@@ -59,8 +78,23 @@ export function CreateKeyDialog({ open, onOpenChange }: { open: boolean; onOpenC
       setCustomExpiry('');
       setError(null);
       setAcknowledged(false);
+      setProjectId('');
+      setTemplateId('');
     }
-  }, [open]);
+    if (open) setServiceAccountId(defaultServiceAccount ?? '');
+  }, [open, defaultServiceAccount]);
+
+  const applyTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = templates.data?.data.find((x) => x.id === id);
+    if (!t) return;
+    setScopes(t.scopes);
+    setEnvironment(t.environment);
+    setIps(t.ip_restrictions.join('\n'));
+    setEndpoints(t.allowed_endpoints.join('\n'));
+    setRateLimit(t.rate_limit ? String(t.rate_limit) : '');
+    setExpiry(t.expires_in_days ? String(t.expires_in_days) : 'never');
+  };
 
   const expiresAt = (): string | null => {
     if (expiry === 'never') return null;
@@ -84,6 +118,8 @@ export function CreateKeyDialog({ open, onOpenChange }: { open: boolean; onOpenC
           rate_limit: rateLimit ? Number(rateLimit) : null,
           expires_at: expiresAt(),
           ...(notes.trim() ? { notes: notes.trim() } : {}),
+          ...(projectId ? { project_id: projectId } : {}),
+          ...(serviceAccountId ? { service_account_id: serviceAccountId } : {}),
         },
       });
       setCreated(res);
@@ -155,6 +191,44 @@ export function CreateKeyDialog({ open, onOpenChange }: { open: boolean; onOpenC
                       <option value="test">Test (cdn_test_…)</option>
                     </NativeSelect>
                   </Field>
+                  {(templates.data?.data.length ?? 0) > 0 && (
+                    <Field label="Template (optional)" hint="Pre-fills scopes, restrictions and lifetime.">
+                      <NativeSelect value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
+                        <option value="">No template</option>
+                        {templates.data!.data.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Field>
+                  )}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {projects.data && (
+                      <Field label="Project scope" hint="Bound keys can only reach that project's zones.">
+                        <NativeSelect className="w-full" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                          <option value="">All files (unbound)</option>
+                          {projects.data.data.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                    )}
+                    {(accounts.data?.data.length ?? 0) > 0 && (
+                      <Field label="Owner" hint="Service accounts own keys for machines.">
+                        <NativeSelect className="w-full" value={serviceAccountId} onChange={(e) => setServiceAccountId(e.target.value)}>
+                          <option value="">Me</option>
+                          {accounts.data!.data.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.name} (service account)
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </Field>
+                    )}
+                  </div>
                   <Field label="Notes (optional, stored encrypted)">
                     <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} />
                   </Field>

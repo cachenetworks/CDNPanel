@@ -9,8 +9,9 @@ import { Field, Input, NativeSelect, Switch, Textarea, Label } from '@/component
 import { ErrorState, KeyValue, PageHeader, Panel, Skeleton } from '@/components/ui/misc';
 import { useConfirm, useStepUp } from '@/components/confirm';
 import { WebhooksSettings } from '@/components/settings/webhooks';
+import { SsoSettings } from '@/components/settings/sso';
 
-type Section = 'general' | 'uploads' | 'files' | 'api' | 'rateLimits' | 'security' | 'retention' | 'analytics';
+type Section = 'general' | 'uploads' | 'files' | 'api' | 'rateLimits' | 'security' | 'retention' | 'analytics' | 'cache' | 'images' | 'media' | 'usage';
 type Settings = Record<Section, Record<string, unknown>>;
 interface SettingsResponse {
   settings: Settings;
@@ -22,14 +23,14 @@ type FieldDef =
   | { key: string; label: string; hint?: string; type: 'number'; unit?: string; scale?: number; nullable?: boolean }
   | { key: string; label: string; hint?: string; type: 'bool' }
   | { key: string; label: string; hint?: string; type: 'select'; options: { value: string; label: string }[] }
-  | { key: string; label: string; hint?: string; type: 'list' };
+  | { key: string; label: string; hint?: string; type: 'list'; numeric?: boolean };
 
 interface Tab {
   id: string;
   label: string;
   section?: Section;
   fields?: FieldDef[];
-  custom?: 'domains' | 'proxy' | 'webhooks' | 'storage';
+  custom?: 'domains' | 'proxy' | 'webhooks' | 'storage' | 'sso';
 }
 
 const MB = 1024 * 1024;
@@ -74,6 +75,44 @@ const TABS: Tab[] = [
       { key: 'enableFriendlyPaths', label: 'Enable friendly paths (/p/folder/file.ext)', type: 'bool' },
       { key: 'signedUrlDefaultExpiry', label: 'Default signed URL lifetime', type: 'number', unit: 'seconds' },
       { key: 'signedUrlMaxExpiry', label: 'Maximum signed URL lifetime', type: 'number', unit: 'seconds' },
+      { key: 'trashRetentionDays', label: 'Recycle bin retention', type: 'number', unit: 'days', hint: 'Deleted files can be restored for this long. 0 deletes immediately.' },
+      { key: 'maxVersionsPerFile', label: 'Revisions kept per file', type: 'number', hint: 'Older revisions are pruned daily.' },
+    ],
+  },
+  {
+    id: 'cache',
+    label: 'Cache',
+    section: 'cache',
+    fields: [
+      { key: 'defaultEdgeTtl', label: 'Default edge TTL (outside zones)', type: 'number', unit: 'seconds', hint: 'Sent as CDN-Cache-Control. Zones and cache rules override it.' },
+      { key: 'defaultBrowserTtl', label: 'Default browser TTL (zones)', type: 'number', unit: 'seconds' },
+      { key: 'autoPurge', label: 'Purge edge caches automatically when files change', type: 'bool', hint: 'Replacement, rename, move, visibility change and deletion. Needs Cloudflare credentials.' },
+      { key: 'prewarmTopFiles', label: 'Pre-warm the most requested files every 6 hours', type: 'number', unit: 'files', hint: '0 disables scheduled pre-warming.' },
+    ],
+  },
+  {
+    id: 'images',
+    label: 'Images',
+    section: 'images',
+    fields: [
+      { key: 'enabled', label: 'Enable image optimisation (/img/…)', type: 'bool' },
+      { key: 'requireSignedTransforms', label: 'Require signed transformation URLs outside zones', type: 'bool', hint: 'Prevents clients from generating unlimited variants.' },
+      { key: 'stripMetadata', label: 'Strip EXIF / GPS metadata from variants', type: 'bool' },
+      { key: 'defaultQuality', label: 'Default quality', type: 'number' },
+      { key: 'maxWidth', label: 'Maximum output width', type: 'number', unit: 'px' },
+      { key: 'maxHeight', label: 'Maximum output height', type: 'number', unit: 'px' },
+      { key: 'maxSourcePixels', label: 'Maximum source size', type: 'number', unit: 'megapixels', scale: 1_000_000 },
+    ],
+  },
+  {
+    id: 'media',
+    label: 'Video & audio',
+    section: 'media',
+    fields: [
+      { key: 'enabled', label: 'Process all video / audio uploads', type: 'bool', hint: 'Zones can enable processing individually. Requires FFmpeg in the worker image.' },
+      { key: 'renditions', label: 'Renditions', type: 'list', hint: 'One per line: thumbnail, preview, mp4_h264, mp4_h265, webm_av1, hls, dash, audio, waveform.' },
+      { key: 'ladder', label: 'HLS / DASH heights', type: 'list', numeric: true, hint: 'One per line, e.g. 360, 720, 1080. Never upscaled.' },
+      { key: 'maxDurationSeconds', label: 'Skip media longer than', type: 'number', unit: 'seconds' },
     ],
   },
   { id: 'storage', label: 'Storage', custom: 'storage' },
@@ -107,6 +146,10 @@ const TABS: Tab[] = [
       { key: 'reauthWindowMinutes', label: 'Step-up re-authentication window', type: 'number', unit: 'minutes', hint: 'How long a password confirmation unlocks sensitive actions.' },
       { key: 'lockoutThreshold', label: 'Failed sign-ins before lockout', type: 'number' },
       { key: 'lockoutMinutes', label: 'Lockout duration', type: 'number', unit: 'minutes' },
+      { key: 'abuseAutoSuspend', label: 'Suspend API keys automatically after repeated denied requests', type: 'bool' },
+      { key: 'abuseThreshold', label: 'Abuse threshold', type: 'number', unit: 'denials' },
+      { key: 'abuseWindowMinutes', label: 'Abuse window', type: 'number', unit: 'minutes' },
+      { key: 'challengeTtlMinutes', label: 'Browser challenge validity', type: 'number', unit: 'minutes' },
     ],
   },
   {
@@ -117,8 +160,10 @@ const TABS: Tab[] = [
       { key: 'requireTwoFactorForAll', label: 'Require two-factor authentication for all staff', type: 'bool' },
       { key: 'sessionTtlHours', label: 'Session lifetime', type: 'number', unit: 'hours' },
       { key: 'rememberMeDays', label: '“Keep me signed in” lifetime', type: 'number', unit: 'days' },
+      { key: 'passwordLoginEnabled', label: 'Allow password sign-in', type: 'bool', hint: 'When off, staff with a passkey or SSO identity must use it. Staff without one can still use their password.' },
     ],
   },
+  { id: 'sso', label: 'Single sign-on', custom: 'sso' },
   {
     id: 'retention',
     label: 'Retention',
@@ -150,6 +195,15 @@ const TABS: Tab[] = [
       { key: 'trackApiRequests', label: 'Track REST API requests (not only file delivery)', type: 'bool' },
     ],
   },
+  {
+    id: 'usage',
+    label: 'Usage & costs',
+    section: 'usage',
+    fields: [
+      { key: 'currency', label: 'Currency for cost estimates', type: 'text', hint: 'Prices are set per storage provider (Storage page).' },
+      { key: 'alertWebhooks', label: 'Send quota.threshold webhooks', type: 'bool' },
+    ],
+  },
   { id: 'proxy', label: 'Proxy / CDN', custom: 'proxy' },
   { id: 'webhooks', label: 'Webhooks', custom: 'webhooks' },
 ];
@@ -177,11 +231,13 @@ function SectionForm({ tab, values, onSaved, editable }: { tab: Tab; values: Rec
     for (const f of tab.fields ?? []) {
       const v = draft[f.key];
       if (f.type === 'bool') patch[f.key] = v;
-      else if (f.type === 'list')
-        patch[f.key] = String(v)
+      else if (f.type === 'list') {
+        const items = String(v)
           .split(/[\n,]/)
           .map((s) => s.trim().replace(/^\./, ''))
           .filter(Boolean);
+        patch[f.key] = f.numeric ? items.map(Number).filter((n) => Number.isFinite(n)) : items;
+      }
       else if (f.type === 'number') patch[f.key] = v === '' && f.nullable ? null : Math.round(Number(v) * (f.scale ?? 1));
       else patch[f.key] = v;
     }
@@ -359,6 +415,8 @@ export default function SettingsPage() {
             </Panel>
           ) : current.custom === 'storage' ? (
             <StorageTab uploads={q.data.settings.uploads} editable={editable} onSaved={refresh} />
+          ) : current.custom === 'sso' ? (
+            <SsoSettings editable={editable} />
           ) : (
             <WebhooksSettings editable={editable} />
           )}

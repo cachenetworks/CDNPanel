@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/storage/package.json packages/storage/
 COPY packages/database/package.json packages/database/
+COPY packages/sdk-js/package.json packages/sdk-js/
+COPY packages/cli/package.json packages/cli/
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 RUN npm ci --no-audit --no-fund

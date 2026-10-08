@@ -9,6 +9,7 @@ import { NativeSelect } from '@/components/ui/form';
 import { Badge, EmptyState, ErrorState, PageHeader, Pagination, Panel, Section, Skeleton } from '@/components/ui/misc';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { useConfirm } from '@/components/confirm';
+import { EdgeSecurity } from '@/components/security/edge';
 
 interface Summary {
   last_24h: Record<string, number>;
@@ -64,7 +65,8 @@ export default function SecurityPage() {
 
   return (
     <>
-      <PageHeader title="Security" description="Authentication failures, suspicious API usage and active staff sessions." />
+      <PageHeader title="Security" description="Edge security rules and IP bans, authentication failures, suspicious API usage and active staff sessions." />
+      <EdgeSecurity />
       {summary.isError && <ErrorState error={summary.error} onRetry={() => summary.refetch()} />}
       <div className="mb-8 grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-4">
         {Object.entries(LABELS).map(([k, label]) => (

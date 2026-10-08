@@ -70,6 +70,13 @@ async function recordLoginFailure(ip: string, emailAddr: string, userId: string 
   }
 }
 
+/** Starts the second step of a sign-in for accounts with TOTP enabled. */
+export async function issueMfaToken(userId: string, rememberMe: boolean): Promise<string> {
+  const mfaToken = randomToken(32);
+  await getRedis().set(`mfa:${sha256Hex(mfaToken)}`, JSON.stringify({ userId, rememberMe, attempts: 0 }), 'EX', 300);
+  return mfaToken;
+}
+
 const sessionExample = {
   user: { id: 'usr_01J9Z8Q4X5K3W2V1T0S9R8Q7P6', email: 'admin@example.com', name: 'Ada Admin', two_factor_enabled: true },
   roles: ['Administrator'],
@@ -111,10 +118,14 @@ export const authRoutes: RouteDef<any, any, any>[] = [
       if (needsRehash(user.passwordHash!)) {
         await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(body.password) } });
       }
+      const settings = await getSettings();
+      if (!settings.security.passwordLoginEnabled) {
+        // Users who have not set up a passkey or SSO identity yet may still use their password, so nobody is locked out.
+        const [passkeys, identities] = await Promise.all([prisma.webAuthnCredential.count({ where: { userId: user.id } }), prisma.userIdentity.count({ where: { userId: user.id } })]);
+        if (passkeys + identities > 0) throw new AppError('forbidden', 'Password sign-in is disabled. Sign in with a passkey or single sign-on.');
+      }
       if (user.totpEnabled && user.totpSecretEnc) {
-        const mfaToken = randomToken(32);
-        await getRedis().set(`mfa:${sha256Hex(mfaToken)}`, JSON.stringify({ userId: user.id, rememberMe: body.remember_me, attempts: 0 }), 'EX', 300);
-        return { mfa_required: true, mfa_token: mfaToken };
+        return { mfa_required: true, mfa_token: await issueMfaToken(user.id, body.remember_me) };
       }
       return completeLogin(req, reply, user.id, body.remember_me);
     },
@@ -441,7 +452,7 @@ export const authRoutes: RouteDef<any, any, any>[] = [
   }),
 ];
 
-async function completeLogin(req: Parameters<typeof createSession>[1], reply: Parameters<typeof createSession>[0], userId: string, rememberMe: boolean) {
+export async function completeLogin(req: Parameters<typeof createSession>[1], reply: Parameters<typeof createSession>[0], userId: string, rememberMe: boolean) {
   const prisma = getPrisma();
   const { token, id } = await createSession(reply, req, userId, rememberMe);
   const user = await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date(), lastLoginIp: req.clientIp } });

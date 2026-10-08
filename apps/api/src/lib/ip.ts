@@ -60,3 +60,13 @@ export function anonymizeIp(ip: string): string {
     return '';
   }
 }
+
+/** Loopback, RFC 1918 / unique-local, link-local and CGNAT addresses. */
+export function isPrivateIp(ip: string): boolean {
+  try {
+    const range = normalize(ipaddr.parse(ip)).range();
+    return ['loopback', 'private', 'uniqueLocal', 'linkLocal', 'carrierGradeNat'].includes(range);
+  } catch {
+    return false;
+  }
+}

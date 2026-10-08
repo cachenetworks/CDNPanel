@@ -28,6 +28,15 @@ export const PERMISSIONS = {
   'settings.view': 'View settings',
   'settings.edit': 'Change settings and webhooks',
   'storage.manage': 'Manage storage providers',
+  'zones.view': 'View projects, zones and domains',
+  'zones.manage': 'Create and configure projects, zones, domains and cache rules',
+  'cache.purge': 'Purge and pre-warm the CDN cache',
+  'shares.manage': 'Create and revoke share links',
+  'security.manage': 'Manage security rules, IP bans, SSO providers and service accounts',
+  'usage.view': 'View usage, quotas and cost estimates',
+  'quotas.manage': 'Create and change usage quotas',
+  'ops.view': 'View operations metrics and background job queues',
+  'ops.manage': 'Retry and remove background jobs',
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -43,8 +52,9 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
   { label: 'API keys', permissions: ['api_keys.view', 'api_keys.create', 'api_keys.revoke', 'api_keys.rotate'] },
   { label: 'Users', permissions: ['users.view', 'users.create', 'users.edit', 'users.disable'] },
   { label: 'Roles', permissions: ['roles.view', 'roles.manage'] },
-  { label: 'Monitoring', permissions: ['analytics.view', 'logs.view'] },
-  { label: 'Administration', permissions: ['settings.view', 'settings.edit', 'storage.manage'] },
+  { label: 'Zones & delivery', permissions: ['zones.view', 'zones.manage', 'cache.purge', 'shares.manage'] },
+  { label: 'Monitoring', permissions: ['analytics.view', 'logs.view', 'usage.view', 'ops.view'] },
+  { label: 'Administration', permissions: ['settings.view', 'settings.edit', 'storage.manage', 'security.manage', 'quotas.manage', 'ops.manage'] },
 ];
 
 export interface DefaultRole {
@@ -56,7 +66,7 @@ export interface DefaultRole {
   locked?: boolean;
 }
 
-const VIEW_ONLY: Permission[] = ['files.view', 'analytics.view'];
+const VIEW_ONLY: Permission[] = ['files.view', 'analytics.view', 'zones.view', 'usage.view'];
 
 export const DEFAULT_ROLES: DefaultRole[] = [
   {
@@ -80,25 +90,26 @@ export const DEFAULT_ROLES: DefaultRole[] = [
       'folders.create', 'folders.edit', 'folders.delete',
       'api_keys.view', 'api_keys.create', 'api_keys.revoke', 'api_keys.rotate',
       'analytics.view', 'logs.view', 'settings.view',
+      'zones.view', 'zones.manage', 'cache.purge', 'shares.manage', 'usage.view', 'ops.view',
     ],
     system: true,
   },
   {
     name: 'Moderator',
     description: 'Reviews and removes content.',
-    permissions: ['files.view', 'files.edit', 'files.delete', 'files.download', 'folders.edit', 'analytics.view', 'logs.view'],
+    permissions: ['files.view', 'files.edit', 'files.delete', 'files.download', 'folders.edit', 'analytics.view', 'logs.view', 'zones.view', 'cache.purge', 'shares.manage'],
     system: true,
   },
   {
     name: 'Support',
     description: 'Assists users and inspects files and logs.',
-    permissions: ['files.view', 'files.download', 'users.view', 'analytics.view', 'logs.view'],
+    permissions: ['files.view', 'files.download', 'users.view', 'analytics.view', 'logs.view', 'zones.view', 'usage.view', 'ops.view'],
     system: true,
   },
   {
     name: 'Uploader',
     description: 'Uploads and organises files.',
-    permissions: ['files.view', 'files.upload', 'files.edit', 'files.download', 'folders.create'],
+    permissions: ['files.view', 'files.upload', 'files.edit', 'files.download', 'folders.create', 'zones.view', 'shares.manage'],
     system: true,
   },
   {
@@ -119,6 +130,11 @@ export const API_SCOPES = {
   'analytics:read': 'Read analytics',
   'metadata:read': 'Read file metadata',
   'metadata:write': 'Write custom file metadata',
+  'zones:read': 'List projects, zones and domains',
+  'zones:write': 'Create and configure zones, domains and cache rules',
+  'cache:purge': 'Purge and pre-warm the CDN cache',
+  'shares:write': 'Create and revoke share links',
+  'usage:read': 'Read usage and quota information',
 } as const;
 
 export type ApiScope = keyof typeof API_SCOPES;

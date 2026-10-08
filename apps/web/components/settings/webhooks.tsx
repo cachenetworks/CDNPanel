@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { api, errorMessage, type Paginated } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { Button } from '../ui/button';
-import { Checkbox, Field, Input, Switch } from '../ui/form';
+import { NativeSelect, Checkbox, Field, Input, Switch } from '../ui/form';
 import { Badge, CopyButton, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, Panel } from '../ui/misc';
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from '../ui/dialog';
 import { Table, TD, TH, THead, TR } from '../ui/table';
@@ -40,6 +40,7 @@ export function WebhooksSettings({ editable }: { editable: boolean }) {
   const [name, setName] = React.useState('');
   const [url, setUrl] = React.useState('');
   const [events, setEvents] = React.useState<string[]>([]);
+  const [sampleEvent, setSampleEvent] = React.useState('file.uploaded');
   const [enabled, setEnabled] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -236,6 +237,28 @@ export function WebhooksSettings({ editable }: { editable: boolean }) {
         <DialogContent size="lg">
           <DialogHeader title={`Deliveries · ${viewing?.name ?? ''}`} description={viewing?.url} />
           <DialogBody>
+            {editable && viewing && (
+              <div className="mb-3 flex items-center gap-2">
+                <NativeSelect value={sampleEvent} onChange={(e) => setSampleEvent(e.target.value)} aria-label="Sample event">
+                  {(q.data?.events ?? []).map((ev) => (
+                    <option key={ev} value={ev}>
+                      {ev}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={async () => {
+                    await api(`/webhooks/${viewing.id}/test-event`, { body: { event: sampleEvent } });
+                    toast.success('Sample event queued');
+                    void deliveries.refetch();
+                  }}
+                >
+                  Send sample event
+                </Button>
+              </div>
+            )}
             {!deliveries.data?.data.length ? (
               <EmptyState title="No deliveries yet" />
             ) : (
@@ -274,6 +297,19 @@ export function WebhooksSettings({ editable }: { editable: boolean }) {
                             }}
                           >
                             Retry
+                          </Button>
+                        )}
+                        {editable && (
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={async () => {
+                              await api(`/webhooks/deliveries/${d.id}/replay`, { method: 'POST' });
+                              toast.success('Replay queued as a new delivery');
+                              void deliveries.refetch();
+                            }}
+                          >
+                            Replay
                           </Button>
                         )}
                       </TD>

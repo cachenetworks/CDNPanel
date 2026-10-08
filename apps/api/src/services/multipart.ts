@@ -2,7 +2,7 @@ import type { FastifyRequest } from 'fastify';
 import type { MultipartFile } from '@fastify/multipart';
 import { z } from 'zod';
 import { AppError, isValidId } from '@cdn/shared';
-import { requireFolder } from '../lib/folders.js';
+import { defaultUploadFolder, requireFolder } from '../lib/folders.js';
 import { actorOf, apiKeyIdOf, userIdOf } from '../http/context.js';
 import { ingestFile } from './ingest.js';
 import type { serializeFile } from '../lib/serialize.js';
@@ -35,6 +35,14 @@ export const UploadOptionsSchema = z.object({
     })
     .optional(),
   sha256: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  /** Comma separated cache tags, e.g. "release:v2,project:sentinel". */
+  cache_tags: z
+    .string()
+    .max(2000)
+    .transform((v) => v.split(',').map((t) => t.trim()).filter(Boolean))
+    .optional(),
+  /** Move the file to the recycle bin after this many days. */
+  expires_in_days: z.coerce.number().int().min(1).max(3650).optional(),
 });
 export type UploadOptions = z.infer<typeof UploadOptionsSchema>;
 
@@ -75,7 +83,7 @@ export async function handleMultipartUpload(req: FastifyRequest, opts: { maxFile
     }
     const folderKey = options.folder_id ?? '';
     if (!resolvedFolder || resolvedFolder.key !== folderKey) {
-      const id: string | null = folderKey && folderKey !== 'root' ? (await requireFolder(req, folderKey)).id : null;
+      const id: string | null = folderKey && folderKey !== 'root' ? (await requireFolder(req, folderKey)).id : await defaultUploadFolder(req);
       resolvedFolder = { key: folderKey, id };
     }
     try {
@@ -87,6 +95,8 @@ export async function handleMultipartUpload(req: FastifyRequest, opts: { maxFile
         cacheControl: options.cache_control ?? null,
         forceDownload: options.force_download,
         metadata: options.metadata,
+        cacheTags: options.cache_tags,
+        expiresAt: options.expires_in_days ? new Date(Date.now() + options.expires_in_days * 86_400_000) : null,
         expectedSha256: options.sha256 ?? null,
         userId: userIdOf(req),
         apiKeyId: apiKeyIdOf(req),

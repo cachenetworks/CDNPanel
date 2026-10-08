@@ -8,6 +8,10 @@ import { scannerFromEnv } from '../lib/scanner.js';
 import { driverForId } from '../lib/storageRegistry.js';
 import { emitWebhookEvent } from '../lib/webhooks.js';
 import { FILE_INCLUDE, serializeFile } from '../lib/serialize.js';
+import { enqueueMedia } from '../lib/queue.js';
+import { zoneForFolder } from '../lib/zones.js';
+import { mediaProcessingEnabled } from '../services/media.js';
+import { scheduleReplication } from '../services/replication.js';
 
 const log = baseLogger.child({ worker: 'file-processing' });
 
@@ -29,7 +33,7 @@ async function streamToBuffer(stream: NodeJS.ReadableStream, max: number): Promi
  *  1. Malware scan (when the file is in SCANNING state). Infected → QUARANTINED, never served.
  *  2. Media metadata (image dimensions, audio/video duration) — best effort, never blocks READY.
  */
-export async function processFile(fileId: string): Promise<void> {
+export async function processFile(fileId: string, opts: { reprocess?: boolean } = {}): Promise<void> {
   const prisma = getPrisma();
   const file = await prisma.file.findUnique({ where: { id: fileId } });
   if (!file) return;
@@ -44,7 +48,7 @@ export async function processFile(fileId: string): Promise<void> {
       await prisma.file.update({ where: { id: file.id }, data: { status: 'QUARANTINED', statusReason: `Malware detected: ${result.signature}`, scannedAt: new Date() } });
       await securityEvent('MALWARE_DETECTED', { severity: 'critical', userId: file.uploadedById, apiKeyId: file.uploadedByApiKeyId, details: { file_id: file.id, name: file.name, signature: result.signature } });
       await audit({ actorType: 'system', actorLabel: 'malware-scanner' }, 'FILE_QUARANTINED', { type: 'file', id: file.id }, { signature: result.signature, engine: result.engine });
-      await emitWebhookEvent('upload.failed', { file_id: file.id, filename: file.name, error: { code: 'malware_detected' } });
+      await emitWebhookEvent('upload.failed', { file_id: file.id, filename: file.name, error: { code: 'malware_detected' } }, { projectId: (await zoneForFolder(file.folderId))?.projectId });
       log.warn({ file_id: file.id, signature: result.signature }, 'file quarantined');
       return;
     }
@@ -80,7 +84,12 @@ export async function processFile(fileId: string): Promise<void> {
     data: { ...data, ...(wasPending ? { status: 'READY', statusReason: null } : {}) },
     include: FILE_INCLUDE,
   });
-  if (wasPending) await emitWebhookEvent('file.uploaded', { file: serializeFile(updated) });
+  if (updated.status !== 'READY') return;
+  const zone = await zoneForFolder(updated.folderId);
+  if (wasPending && !opts.reprocess) await emitWebhookEvent('file.uploaded', { file: serializeFile(updated) }, { projectId: zone?.projectId });
+  // Derived work once content is final (each upload / revision is processed once): replicas and media renditions.
+  await scheduleReplication(updated, { force: opts.reprocess });
+  if (await mediaProcessingEnabled(updated)) await enqueueMedia(updated.id);
 }
 
 /** Called when all retries are exhausted. */

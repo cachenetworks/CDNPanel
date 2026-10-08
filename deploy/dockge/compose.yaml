@@ -37,6 +37,13 @@ x-app-env: &app-env
   CLAMAV_HOST: ${CLAMAV_HOST:-}
   CLAMAV_PORT: ${CLAMAV_PORT:-3310}
   WEBHOOK_ALLOW_PRIVATE_NETWORKS: ${WEBHOOK_ALLOW_PRIVATE_NETWORKS:-false}
+  # 2.0: custom domains, edge purges, observability (all optional)
+  DOMAIN_CNAME_TARGET: ${DOMAIN_CNAME_TARGET:-}
+  CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+  CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
+  ASN_HEADER: ${ASN_HEADER:-}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 
 services:
   postgres:
@@ -94,7 +101,7 @@ services:
     environment:
       <<: *app-env
       SERVICE_NAME: cdn-worker
-    command: ['node', 'dist/worker/index.js']
+    command: ['node', '--import', './dist/otel.js', 'dist/worker/index.js']
     volumes:
       - cdn-data:/data
     healthcheck:
@@ -199,6 +206,17 @@ configs:
       # never leave Nginx pointing at a stale address.
       resolver 127.0.0.11 valid=10s ipv6=off;
 
+      # Custom zone domains (assets.example.com) serve files at zone-relative paths. Every Host other
+      # than the dashboard host (PANEL_HOST) is treated as a zone domain; the API answers 404 for
+      # hostnames that are not verified. With PANEL_HOST unset this is disabled and zone domains are
+      # served through /files, /p, /img, /media and /s URLs only.
+      map "$$host:${PANEL_HOST:-}" $$zone_host {
+        default                         1;
+        "~^[^:]*:$$"                     0;   # PANEL_HOST not configured
+        "~^([^:]+):\1$$"                 0;   # the dashboard host itself
+        "~^(localhost|127\.0\.0\.1|nginx)(:|$$)" 0;
+      }
+
       server {
         listen 8080;
         server_name _;
@@ -231,8 +249,10 @@ configs:
           proxy_pass $$cdn_api;
         }
 
-        # File delivery: authorization happens in the API; bytes are served by nginx via X-Accel-Redirect.
-        location ~ ^/(files|p)/ {
+        # Delivery: files, friendly paths, image transformations, media renditions, share links,
+        # browser challenges, signed-cookie installation and domain-verification probes.
+        # Authorization happens in the API; local files are served by nginx via X-Accel-Redirect.
+        location ~ ^/(files|p|img|media|s|_challenge|_auth|\.well-known/cdnpanel)/ {
           proxy_pass $$cdn_api;
           proxy_buffering off;
           proxy_read_timeout 600s;
@@ -240,6 +260,7 @@ configs:
         }
         location = /openapi.json { proxy_pass $$cdn_api; }
         location /health { proxy_pass $$cdn_api; }
+        # /metrics is deliberately not routed: scrape api:4000/metrics from inside the network.
 
         # Internal location used only by X-Accel-Redirect from the API — not reachable directly.
         location /_protected_storage/ {
@@ -250,8 +271,20 @@ configs:
           # nginx serves ranges/conditionals itself; headers set by the API are preserved.
         }
 
-        # Dashboard
+        # Zone-relative paths on custom domains, reached only through the rewrite below.
+        location /_zone/ {
+          internal;
+          proxy_pass $$cdn_api;
+          proxy_buffering off;
+          proxy_read_timeout 600s;
+          proxy_force_ranges on;
+        }
+
+        # Dashboard (or zone content on custom domains)
         location / {
+          if ($$zone_host) {
+            rewrite ^ /_zone$$uri last;
+          }
           proxy_pass $$cdn_web;
           proxy_read_timeout 60s;
         }

@@ -1,7 +1,9 @@
 'use client';
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Fingerprint } from 'lucide-react';
+import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
 import { api, errorMessage, setCsrfToken } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Checkbox, Field, Input, Label } from '@/components/ui/form';
@@ -17,6 +19,18 @@ function safeNext(next: string | null): string {
   return next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
 }
 
+const SSO_ERRORS: Record<string, string> = {
+  no_matching_account: 'No staff account matches that identity. Ask an administrator to invite you or link it from your account page.',
+  domain_not_allowed: 'Your email domain is not allowed for this sign-in provider.',
+  account_disabled: 'This account has been disabled.',
+  state_expired: 'The sign-in attempt expired. Please try again.',
+};
+
+interface SsoInfo {
+  password_login: boolean;
+  providers: { slug: string; name: string; kind: string; start_url: string }[];
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -24,10 +38,29 @@ function LoginForm() {
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [remember, setRemember] = React.useState(false);
-  const [mfaToken, setMfaToken] = React.useState<string | null>(null);
+  // SSO sign-ins for accounts with TOTP come back here with an MFA token.
+  const [mfaToken, setMfaToken] = React.useState<string | null>(params.get('mfa_token'));
   const [code, setCode] = React.useState('');
   const [busy, setBusy] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const ssoError = params.get('sso_error');
+  const [error, setError] = React.useState<string | null>(ssoError ? (SSO_ERRORS[ssoError] ?? `Single sign-on failed (${ssoError}).`) : null);
+  const [passkeys, setPasskeys] = React.useState(false);
+  React.useEffect(() => setPasskeys(browserSupportsWebAuthn()), []);
+  const sso = useQuery({ queryKey: ['sso-public'], queryFn: () => api<SsoInfo>('/auth/sso/providers', { silent: true }), retry: false });
+
+  const passkeyLogin = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { flow_id, options } = await api<{ flow_id: string; options: Parameters<typeof startAuthentication>[0]['optionsJSON'] }>('/auth/passkeys/login/options', { method: 'POST', silent: true });
+      const response = await startAuthentication({ optionsJSON: options });
+      finish(await api<LoginResponse>('/auth/passkeys/login/verify', { body: { flow_id, response, remember_me: remember }, silent: true }));
+    } catch (err) {
+      setError((err as Error).name === 'NotAllowedError' ? 'Passkey sign-in was cancelled.' : errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const finish = (res: LoginResponse) => {
     if (res.csrf_token) setCsrfToken(res.csrf_token);
@@ -57,8 +90,30 @@ function LoginForm() {
     }
   };
 
+  const next = safeNext(params.get('next'));
   return (
     <form onSubmit={submit} className="space-y-4">
+      {!mfaToken && (passkeys || (sso.data?.providers.length ?? 0) > 0) && (
+        <div className="space-y-2">
+          {passkeys && (
+            <Button type="button" variant="secondary" className="w-full" onClick={passkeyLogin} disabled={busy}>
+              <Fingerprint /> Sign in with a passkey
+            </Button>
+          )}
+          {sso.data?.providers.map((p) => (
+            <Button key={p.slug} type="button" variant="secondary" className="w-full" asChild>
+              <a href={`${p.start_url}?next=${encodeURIComponent(next)}${remember ? '&remember_me=1' : ''}`}>Continue with {p.name}</a>
+            </Button>
+          ))}
+          {sso.data?.password_login !== false && (
+            <div className="flex items-center gap-2 py-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          )}
+        </div>
+      )}
       {!mfaToken ? (
         <>
           <Field label="Email" htmlFor="email">

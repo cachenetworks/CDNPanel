@@ -15,6 +15,17 @@ import { settingsRoutes } from './settings.js';
 import { storageRoutes } from './storage.js';
 import { webhookRoutes } from './webhooks.js';
 import { deliveryRoutes } from './delivery.js';
+import { zoneRoutes } from './zones.js';
+import { cacheRoutes } from './cache.js';
+import { imageRoutes } from './images.js';
+import { mediaRoutes } from './media.js';
+import { shareRoutes } from './shares.js';
+import { versionRoutes } from './versions.js';
+import { edgeSecurityRoutes } from './edgeSecurity.js';
+import { identityRoutes } from './identity.js';
+import { usageRoutes } from './usage.js';
+import { platformRoutes } from './platform.js';
+import { opsRoutes } from './ops.js';
 
 /**
  * All v1 routes. A future /api/v2 can register its own route set alongside this one;
@@ -35,6 +46,17 @@ export const ALL_ROUTES = [
   ...settingsRoutes,
   ...storageRoutes,
   ...webhookRoutes,
+  ...zoneRoutes,
+  ...cacheRoutes,
+  ...imageRoutes,
+  ...mediaRoutes,
+  ...shareRoutes,
+  ...versionRoutes,
+  ...edgeSecurityRoutes,
+  ...identityRoutes,
+  ...usageRoutes,
+  ...platformRoutes,
+  ...opsRoutes,
   ...deliveryRoutes,
 ];
 

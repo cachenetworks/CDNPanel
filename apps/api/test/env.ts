@@ -16,3 +16,4 @@ process.env.UPLOAD_TMP_PATH = path.resolve('.test-data', 'tmp');
 process.env.TRUST_PROXY = 'false';
 process.env.MAX_UPLOAD_SIZE = '50MB';
 process.env.LOG_LEVEL = 'silent';
+process.env.DOMAIN_VERIFICATION_DISABLED = 'true';

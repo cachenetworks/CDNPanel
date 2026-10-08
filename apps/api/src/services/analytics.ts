@@ -33,7 +33,7 @@ function filterSql(f: Filter): Prisma.Sql {
   return parts.length ? Prisma.join(parts, ' ') : Prisma.empty;
 }
 
-const DOWNLOAD_COND = Prisma.sql`("kind" = 'delivery' AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start'))`;
+const DOWNLOAD_COND = Prisma.sql`("kind" IN ('delivery', 'share') AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start'))`;
 
 type Row = Record<string, unknown>;
 
@@ -52,7 +52,7 @@ export async function timeSeries(range: Range, filter: Filter = {}) {
            count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads,
            coalesce(sum("bytesSent"), 0) AS bytes,
            count(*) FILTER (WHERE "statusCode" >= 400) AS errors,
-           count(*) FILTER (WHERE "cacheStatus" = 'revalidated') AS cache_hits,
+           count(*) FILTER (WHERE "cacheStatus" IN ('revalidated', 'variant-hit')) AS cache_hits,
            coalesce(avg("responseMs"), 0) AS avg_ms
     FROM "FileRequest"
     WHERE "timestamp" >= ${utc(range.from)} AND "timestamp" <= ${utc(range.to)} ${filterSql(filter)}
@@ -107,8 +107,8 @@ export async function totals(range: Range, filter: Filter = {}) {
            coalesce(sum("bytesSent"), 0) AS bytes,
            count(*) FILTER (WHERE "statusCode" >= 400) AS errors,
            count(*) FILTER (WHERE "kind" = 'api' AND "statusCode" >= 400) AS api_errors,
-           count(*) FILTER (WHERE "cacheStatus" = 'revalidated') AS cache_hits,
-           count(*) FILTER (WHERE "kind" = 'delivery') AS delivery_requests,
+           count(*) FILTER (WHERE "cacheStatus" IN ('revalidated', 'variant-hit')) AS cache_hits,
+           count(*) FILTER (WHERE "kind" <> 'api') AS delivery_requests,
            coalesce(avg("responseMs"), 0) AS avg_ms,
            coalesce(percentile_cont(0.95) WITHIN GROUP (ORDER BY "responseMs"), 0) AS p95_ms
     FROM "FileRequest"
@@ -133,7 +133,7 @@ export async function breakdowns(range: Range, filter: Filter = {}) {
   const [statusCodes, countries, mimes, topFiles, topKeys, topFolders] = await Promise.all([
     prisma.$queryRaw<Row[]>`SELECT "statusCode" AS code, count(*) AS count FROM "FileRequest" WHERE ${where} GROUP BY "statusCode" ORDER BY count DESC LIMIT 20`,
     prisma.$queryRaw<Row[]>`SELECT coalesce("country", 'Unknown') AS country, count(*) AS requests, coalesce(sum("bytesSent"),0) AS bytes FROM "FileRequest" WHERE ${where} GROUP BY 1 ORDER BY requests DESC LIMIT 15`,
-    prisma.$queryRaw<Row[]>`SELECT coalesce("mimeType", 'n/a') AS mime, count(*) AS requests, coalesce(sum("bytesSent"),0) AS bytes FROM "FileRequest" WHERE ${where} AND "kind" = 'delivery' GROUP BY 1 ORDER BY bytes DESC LIMIT 15`,
+    prisma.$queryRaw<Row[]>`SELECT coalesce("mimeType", 'n/a') AS mime, count(*) AS requests, coalesce(sum("bytesSent"),0) AS bytes FROM "FileRequest" WHERE ${where} AND "kind" <> 'api' GROUP BY 1 ORDER BY bytes DESC LIMIT 15`,
     prisma.$queryRaw<Row[]>`SELECT r."fileId" AS id, f."name" AS name, count(*) FILTER (WHERE ${DOWNLOAD_COND}) AS downloads, count(*) AS requests, coalesce(sum(r."bytesSent"),0) AS bytes
       FROM "FileRequest" r JOIN "File" f ON f."id" = r."fileId" WHERE r."timestamp" >= ${utc(range.from)} AND r."timestamp" <= ${utc(range.to)} ${filterSql(filter)}
       GROUP BY r."fileId", f."name" ORDER BY bytes DESC LIMIT 10`,
@@ -141,7 +141,7 @@ export async function breakdowns(range: Range, filter: Filter = {}) {
       FROM "FileRequest" r JOIN "ApiKey" k ON k."id" = r."apiKeyId" WHERE r."timestamp" >= ${utc(range.from)} AND r."timestamp" <= ${utc(range.to)} ${filterSql(filter)}
       GROUP BY r."apiKeyId", k."name", k."prefix" ORDER BY requests DESC LIMIT 10`,
     prisma.$queryRaw<Row[]>`SELECT r."folderId" AS id, coalesce(fo."path", '/') AS path, count(*) AS requests, coalesce(sum(r."bytesSent"),0) AS bytes
-      FROM "FileRequest" r LEFT JOIN "Folder" fo ON fo."id" = r."folderId" WHERE r."kind" = 'delivery' AND r."timestamp" >= ${utc(range.from)} AND r."timestamp" <= ${utc(range.to)} ${filterSql(filter)}
+      FROM "FileRequest" r LEFT JOIN "Folder" fo ON fo."id" = r."folderId" WHERE r."kind" <> 'api' AND r."timestamp" >= ${utc(range.from)} AND r."timestamp" <= ${utc(range.to)} ${filterSql(filter)}
       GROUP BY r."folderId", fo."path" ORDER BY bytes DESC LIMIT 10`,
   ]);
   return {

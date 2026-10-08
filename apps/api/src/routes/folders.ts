@@ -4,7 +4,8 @@ import { AppError, isValidId, newId, normalizeName, slugifySegment } from '@cdn/
 import { defineRoute, enforceReauth, pageQuery, paginate, type RouteDef } from '../http/route.js';
 import { actorOf, type SessionAuth } from '../http/context.js';
 import { audit } from '../lib/audit.js';
-import { getFolderChain, hiddenFolderIds, requireFolder } from '../lib/folders.js';
+import { getFolderChain, hiddenFolderIds, projectFolderFilter, requireFolder } from '../lib/folders.js';
+import { invalidateZones } from '../lib/zones.js';
 import { serializeFolder } from '../lib/serialize.js';
 import { deleteFiles } from '../services/files.js';
 import { emitWebhookEvent } from '../lib/webhooks.js';
@@ -88,6 +89,8 @@ export const folderRoutes: RouteDef<any, any, any>[] = [
       if (query.q) and.push({ name: { contains: query.q, mode: 'insensitive' } });
       const hidden = await hiddenFolderIds(req);
       if (hidden.length) and.push({ id: { notIn: hidden } });
+      const scope = await projectFolderFilter(req);
+      if (scope) and.push(scope);
       const where = { AND: and };
       const limit = query.all === 'true' ? Math.max(query.limit, 500) : query.limit;
       const [total, rows] = await Promise.all([
@@ -213,6 +216,7 @@ export const folderRoutes: RouteDef<any, any, any>[] = [
           },
         });
       });
+      invalidateZones();
       await audit(actorOf(req), parentId !== folder.parentId ? 'FOLDER_MOVE' : 'FOLDER_UPDATE', { type: 'folder', id: folder.id }, { from_path: folder.path, to_path: newPath, changes: body });
       return withBreadcrumbs(updated);
     },
@@ -254,6 +258,7 @@ export const folderRoutes: RouteDef<any, any, any>[] = [
       for (const f of subtree.sort((a, b) => b.path.length - a.path.length)) {
         await prisma.folder.delete({ where: { id: f.id } });
       }
+      invalidateZones();
       await audit(actorOf(req), 'FOLDER_DELETE', { type: 'folder', id: folder.id }, { path: folder.path, deleted_folders: subtree.length, deleted_files: files.length });
       for (const f of files) await emitWebhookEvent('file.deleted', { file: { id: f.id, name: f.name, folder_id: f.folderId } });
       return { deleted_folders: subtree.length, deleted_files: files.length };

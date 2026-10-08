@@ -5,12 +5,14 @@ import { defineRoute, enforceReauth, pageQuery, paginate, type RouteDef } from '
 import { actorOf, apiKeyIdOf, userIdOf, type SessionAuth } from '../http/context.js';
 import { env, getKeyring } from '../config/env.js';
 import { audit } from '../lib/audit.js';
-import { hiddenFolderIds, requireFolder } from '../lib/folders.js';
+import { hiddenFolderIds, projectFileFilter, requireFolder } from '../lib/folders.js';
 import { FILE_INCLUDE, serializeFile } from '../lib/serialize.js';
 import { getSettings } from '../lib/settings.js';
 import { emitWebhookEvent } from '../lib/webhooks.js';
-import { copyFile, deleteFiles, requireFile } from '../services/files.js';
-import { uniqueFileSlug } from '../services/ingest.js';
+import { copyFile, deleteFiles, requireFile, trashFiles } from '../services/files.js';
+import { normalizeTags, uniqueFileSlug } from '../services/ingest.js';
+import { autoPurgeFiles } from '../services/purge.js';
+import { zoneForFolder } from '../lib/zones.js';
 import { handleMultipartUpload } from '../services/multipart.js';
 import { sendFile } from '../services/delivery.js';
 
@@ -79,6 +81,7 @@ const listQuery = pageQuery.extend({
   type: z.enum(['image', 'video', 'audio', 'document', 'archive', 'other']).optional(),
   visibility: z.enum(['PUBLIC', 'PRIVATE', 'AUTHENTICATED', 'SIGNED_URL_ONLY']).optional(),
   status: z.enum(['UPLOADING', 'PROCESSING', 'SCANNING', 'READY', 'QUARANTINED', 'FAILED']).optional(),
+  tag: z.string().max(100).optional().describe('Only files carrying this cache tag.'),
   uploaded_by: z.string().max(64).optional().describe('Uploader user id or API key id.'),
   created_after: z.coerce.date().optional(),
   created_before: z.coerce.date().optional(),
@@ -103,7 +106,10 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
     errors: ['unauthenticated', 'insufficient_scope', 'forbidden', 'validation_failed'],
     async handler({ req, query }) {
       const prisma = getPrisma();
-      const and: Prisma.FileWhereInput[] = [];
+      const and: Prisma.FileWhereInput[] = [{ deletedAt: null }];
+      const scope = await projectFileFilter(req);
+      if (scope) and.push(scope);
+      if (query.tag) and.push({ cacheTags: { has: query.tag.toLowerCase() } });
       if (query.folder_id) {
         if (query.folder_id === 'root') {
           if (query.recursive !== 'true') and.push({ folderId: null });
@@ -173,6 +179,8 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
       { name: 'force_download', type: 'boolean', description: 'Always serve with Content-Disposition: attachment.' },
       { name: 'metadata', type: 'string', description: 'JSON object of custom metadata (requires metadata:write for API keys).' },
       { name: 'sha256', type: 'string', description: 'Expected SHA-256 (hex). The upload is rejected if the content does not match.' },
+      { name: 'cache_tags', type: 'string', description: 'Comma separated cache tags for targeted purges, e.g. "release:v2,project:sentinel".' },
+      { name: 'expires_in_days', type: 'integer', description: 'Move the file to the recycle bin automatically after this many days.' },
     ],
     responses: { 201: { description: 'File created', example: FILE_EXAMPLE } },
     errors: ['file_too_large', 'unsupported_file_type', 'quota_exceeded', 'checksum_mismatch', 'folder_not_found', 'insufficient_scope', 'validation_failed'],
@@ -217,6 +225,8 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
         cache_control: z.string().max(200).regex(/^[\w\s,=-]+$/).nullable().optional(),
         force_download: z.boolean().optional(),
         metadata: z.record(z.unknown()).optional(),
+        cache_tags: z.array(z.string().max(100)).max(32).optional(),
+        expires_at: z.coerce.date().nullable().optional(),
       })
       .strict(),
     responses: { 200: { description: 'Updated file', example: FILE_EXAMPLE } },
@@ -243,7 +253,13 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
       if (body.cache_control !== undefined) data.cacheControl = body.cache_control;
       if (body.force_download !== undefined) data.forceDownload = body.force_download;
       if (body.metadata !== undefined) data.metadata = body.metadata as Prisma.InputJsonValue;
+      if (body.cache_tags !== undefined) data.cacheTags = normalizeTags(body.cache_tags);
+      if (body.expires_at !== undefined) data.expiresAt = body.expires_at;
       const updated = await getPrisma().file.update({ where: { id: file.id }, data, include: FILE_INCLUDE });
+      // Anything affecting the response (URL, headers, access) invalidates edge caches.
+      if (body.name !== undefined || body.visibility !== undefined || body.cache_control !== undefined || body.force_download !== undefined || body.cache_tags !== undefined) {
+        await autoPurgeFiles([file], 'file updated');
+      }
       const action = body.name !== undefined && body.name !== file.name && Object.keys(body).length === 1 ? 'FILE_RENAME' : 'FILE_UPDATE';
       await audit(actorOf(req), action, { type: 'file', id: file.id }, { changes: { ...body, metadata: body.metadata ? '[updated]' : undefined }, previous_name: file.name });
       const serialized = serializeFile(updated);
@@ -256,18 +272,27 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
     url: '/api/v1/files/:id',
     tag: 'Files',
     summary: 'Delete a file',
-    description: 'Permanently deletes the file record and, once no other record references it, the stored object.',
+    description:
+      'Moves the file to the recycle bin (restorable for the configured retention period; it stops being served immediately). Pass `permanent=true` to delete the record and, once nothing else references it, the stored object right away.',
     auth: 'any',
     permission: 'files.delete',
     scope: 'files:delete',
     params: fileId,
+    query: z.object({ permanent: z.enum(['true', 'false']).default('false') }),
     responses: { 204: { description: 'Deleted' } },
     errors: ['file_not_found', 'invalid_id'],
-    async handler({ req, params }) {
-      const file = await requireFile(req, params.id);
-      await deleteFiles([file]);
-      await audit(actorOf(req), 'FILE_DELETE', { type: 'file', id: file.id }, { name: file.name, size: Number(file.size) });
-      await emitWebhookEvent('file.deleted', { file: { id: file.id, name: file.name, folder_id: file.folderId } });
+    async handler({ req, params, query }) {
+      const file = await requireFile(req, params.id, { includeDeleted: query.permanent === 'true' });
+      const settings = await getSettings();
+      let outcome: 'trashed' | 'deleted';
+      if (query.permanent === 'true') {
+        await deleteFiles([file]);
+        outcome = 'deleted';
+      } else outcome = await trashFiles([file], userIdOf(req), settings.files.trashRetentionDays);
+      await audit(actorOf(req), outcome === 'deleted' ? 'FILE_DELETE' : 'FILE_TRASH', { type: 'file', id: file.id }, { name: file.name, size: Number(file.size) });
+      const zone = await zoneForFolder(file.folderId);
+      await emitWebhookEvent(outcome === 'deleted' ? 'file.deleted' : 'file.trashed', { file: { id: file.id, name: file.name, folder_id: file.folderId } }, { projectId: zone?.projectId });
+      await autoPurgeFiles([file], 'file deleted');
     },
   }),
   defineRoute({
@@ -275,10 +300,10 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
     url: '/api/v1/files/bulk-delete',
     tag: 'Files',
     summary: 'Delete many files',
-    description: 'Deletes up to 500 files. Deleting more than 20 files at once requires a recent password re-authentication.',
+    description: 'Moves up to 500 files to the recycle bin (or deletes them with `permanent: true`). Deleting more than 20 files at once requires a recent password re-authentication.',
     auth: 'session',
     permission: 'files.delete',
-    body: z.object({ ids: z.array(z.string().max(64)).min(1).max(500) }),
+    body: z.object({ ids: z.array(z.string().max(64)).min(1).max(500), permanent: z.boolean().default(false) }),
     responses: { 200: { description: 'Deletion result', example: { deleted: 12, not_found: [] } } },
     errors: ['reauthentication_required', 'validation_failed'],
     async handler({ req, body, auth }) {
@@ -293,10 +318,16 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
           notFound.push(id);
         }
       }
-      await deleteFiles(files);
-      await audit(actorOf(req), 'FILE_BULK_DELETE', { type: 'file' }, { count: files.length, ids: files.map((f) => f.id) });
-      for (const f of files) await emitWebhookEvent('file.deleted', { file: { id: f.id, name: f.name, folder_id: f.folderId } });
-      return { deleted: files.length, not_found: notFound };
+      const settings = await getSettings();
+      let outcome: 'trashed' | 'deleted';
+      if (body.permanent) {
+        await deleteFiles(files);
+        outcome = 'deleted';
+      } else outcome = await trashFiles(files, userIdOf(req), settings.files.trashRetentionDays);
+      await audit(actorOf(req), 'FILE_BULK_DELETE', { type: 'file' }, { count: files.length, ids: files.map((f) => f.id), permanent: outcome === 'deleted' });
+      for (const f of files) await emitWebhookEvent(outcome === 'deleted' ? 'file.deleted' : 'file.trashed', { file: { id: f.id, name: f.name, folder_id: f.folderId } });
+      await autoPurgeFiles(files, 'bulk delete');
+      return { deleted: files.length, not_found: notFound, trashed: outcome === 'trashed' };
     },
   }),
   defineRoute({
@@ -317,6 +348,7 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
       const slug = await uniqueFileSlug(target?.id ?? null, file.name, file.id);
       const updated = await getPrisma().file.update({ where: { id: file.id }, data: { folderId: target?.id ?? null, slug }, include: FILE_INCLUDE });
       await audit(actorOf(req), 'FILE_MOVE', { type: 'file', id: file.id }, { from: file.folderId, to: target?.id ?? null });
+      await autoPurgeFiles([file], 'file moved');
       const serialized = serializeFile(updated);
       await emitWebhookEvent('file.updated', { file: serialized });
       return serialized;

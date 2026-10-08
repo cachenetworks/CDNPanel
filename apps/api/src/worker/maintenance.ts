@@ -45,7 +45,9 @@ export async function aggregateDay(day: Date): Promise<void> {
     { name: 'total', expr: `''` },
     { name: 'file', expr: `"fileId"`, filter: `"fileId" IS NOT NULL` },
     { name: 'api_key', expr: `"apiKeyId"`, filter: `"apiKeyId" IS NOT NULL` },
-    { name: 'mime', expr: `coalesce("mimeType", '')`, filter: `"kind" = 'delivery'` },
+    { name: 'mime', expr: `coalesce("mimeType", '')`, filter: `"kind" <> 'api'` },
+    { name: 'zone', expr: `"zoneId"`, filter: `"zoneId" IS NOT NULL` },
+    { name: 'project', expr: `"projectId"`, filter: `"projectId" IS NOT NULL` },
     { name: 'country', expr: `coalesce("country", 'Unknown')` },
     { name: 'status', expr: `"statusCode"::text` },
   ];
@@ -55,7 +57,7 @@ export async function aggregateDay(day: Date): Promise<void> {
       `INSERT INTO "AnalyticsDaily" ("id", "date", "dimension", "dimensionId", "requests", "downloads", "bytes", "errors", "uploads", "avgMs", "updatedAt")
        SELECT 'agg_' || md5($3 || ':' || ${d.expr} || ':' || $1::text), ($1::timestamptz AT TIME ZONE 'UTC')::date, $3, ${d.expr},
               count(*),
-              count(*) FILTER (WHERE "kind" = 'delivery' AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start')),
+              count(*) FILTER (WHERE "kind" IN ('delivery', 'share') AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start')),
               coalesce(sum("bytesSent"), 0),
               count(*) FILTER (WHERE "statusCode" >= 400),
               0,

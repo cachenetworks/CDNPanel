@@ -15,6 +15,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from '@
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { RankedBars } from '@/components/charts';
 import { useConfirm, useStepUp } from '@/components/confirm';
+import { ListInput, StatusDot, healthTone } from '@/components/ui/stat';
 
 interface Provider {
   id: string;
@@ -27,6 +28,14 @@ interface Provider {
   available: number | null;
   used: number;
   file_count: number;
+  region: string;
+  serves_countries: string[];
+  priority: number;
+  cost_storage_per_gb_month: number;
+  cost_egress_per_gb: number;
+  cost_per_million_requests: number;
+  health_status: string;
+  latency_ms: number | null;
 }
 interface StorageStats {
   used: number;
@@ -65,6 +74,12 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
   const [capacityGb, setCapacityGb] = React.useState('');
   const [replaceConfig, setReplaceConfig] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [regionLabel, setRegion2] = React.useState('');
+  const [serves, setServes] = React.useState<string[]>([]);
+  const [priority, setPriority] = React.useState('100');
+  const [costStorage, setCostStorage] = React.useState('0');
+  const [costEgress, setCostEgress] = React.useState('0');
+  const [costRequests, setCostRequests] = React.useState('0');
 
   React.useEffect(() => {
     if (open) {
@@ -80,8 +95,22 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
       setPathStyle(false);
       setCapacityGb(provider?.capacity ? String(Math.round(provider.capacity / 1024 ** 3)) : '');
       setReplaceConfig(!provider);
+      setRegion2(provider?.region ?? '');
+      setServes(provider?.serves_countries ?? []);
+      setPriority(String(provider?.priority ?? 100));
+      setCostStorage(String(provider?.cost_storage_per_gb_month ?? 0));
+      setCostEgress(String(provider?.cost_egress_per_gb ?? 0));
+      setCostRequests(String(provider?.cost_per_million_requests ?? 0));
     }
   }, [open, provider]);
+  const placement = {
+    region: regionLabel.trim(),
+    serves_countries: serves,
+    priority: Number(priority) || 0,
+    cost_storage_per_gb_month: Number(costStorage) || 0,
+    cost_egress_per_gb: Number(costEgress) || 0,
+    cost_per_million_requests: Number(costRequests) || 0,
+  };
 
   const config = kind === 'LOCAL' ? { kind, root } : { kind, endpoint: endpoint || undefined, region, bucket, accessKeyId, secretAccessKey, forcePathStyle: pathStyle, prefix: prefix || undefined };
 
@@ -97,8 +126,8 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
               async () => {
                 try {
                   const capacity = capacityGb ? Number(capacityGb) * 1024 ** 3 : null;
-                  if (provider) await api(`/storage/providers/${provider.id}`, { method: 'PATCH', body: { name, capacity, ...(replaceConfig ? { config } : {}) } });
-                  else await api('/storage/providers', { body: { name, capacity, config } });
+                  if (provider) await api(`/storage/providers/${provider.id}`, { method: 'PATCH', body: { name, capacity, ...placement, ...(replaceConfig ? { config } : {}) } });
+                  else await api('/storage/providers', { body: { name, capacity, config, ...placement } });
                   void qc.invalidateQueries({ queryKey: ['storage'] });
                   onOpenChange(false);
                 } finally {
@@ -165,6 +194,26 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
             <Field label="Capacity (GB, optional)" hint="Used for capacity dashboards. Upload quotas are configured in Settings → Uploads.">
               <Input type="number" min={1} value={capacityGb} onChange={(e) => setCapacityGb(e.target.value)} className="w-40" />
             </Field>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Region label">
+                <Input value={regionLabel} onChange={(e) => setRegion2(e.target.value)} placeholder="au-hobart" />
+              </Field>
+              <Field label="Serves countries" hint="Used by the NEAREST strategy and the delivery map.">
+                <ListInput upper value={serves} onChange={setServes} placeholder="AU, NZ" />
+              </Field>
+              <Field label="Priority" hint="Lower is preferred.">
+                <Input type="number" min={0} value={priority} onChange={(e) => setPriority(e.target.value)} />
+              </Field>
+              <Field label="Storage price / GB-month">
+                <Input type="number" min={0} step="0.0001" value={costStorage} onChange={(e) => setCostStorage(e.target.value)} />
+              </Field>
+              <Field label="Egress price / GB">
+                <Input type="number" min={0} step="0.0001" value={costEgress} onChange={(e) => setCostEgress(e.target.value)} />
+              </Field>
+              <Field label="Price / million requests">
+                <Input type="number" min={0} step="0.0001" value={costRequests} onChange={(e) => setCostRequests(e.target.value)} />
+              </Field>
+            </div>
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
@@ -256,6 +305,9 @@ export default function StoragePage() {
                     <TR key={p.id}>
                       <TD className="font-medium">
                         {p.name} {p.is_default && <Badge tone="info">Default</Badge>}
+                        <span className="ml-2">
+                          <StatusDot status={healthTone(p.health_status)} label={<span className="text-xs text-muted-foreground">{[p.region, p.latency_ms !== null ? `${p.latency_ms} ms` : p.health_status].filter(Boolean).join(' · ')}</span>} />
+                        </span>
                       </TD>
                       <TD>{p.kind}</TD>
                       <TD className="max-w-[260px] truncate font-mono text-xs text-muted-foreground">{p.public_info.root ?? [p.public_info.bucket, p.public_info.endpoint].filter(Boolean).join(' @ ')}</TD>

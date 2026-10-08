@@ -22,6 +22,27 @@ import { getSettings } from '../lib/settings.js';
 
 const providerParams = z.object({ id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') });
 
+/** Placement and cost fields used by replication (NEAREST / FAILOVER) and usage cost estimates. */
+const placement = {
+  region: z.string().trim().max(60).optional(),
+  serves_countries: z.array(z.string().regex(/^[A-Z]{2}$/)).max(250).optional(),
+  priority: z.number().int().min(0).max(10_000).optional(),
+  cost_storage_per_gb_month: z.number().min(0).max(1000).optional(),
+  cost_egress_per_gb: z.number().min(0).max(1000).optional(),
+  cost_per_million_requests: z.number().min(0).max(1000).optional(),
+};
+
+function placementData(body: { region?: string; serves_countries?: string[]; priority?: number; cost_storage_per_gb_month?: number; cost_egress_per_gb?: number; cost_per_million_requests?: number }) {
+  return {
+    ...(body.region !== undefined ? { region: body.region } : {}),
+    ...(body.serves_countries !== undefined ? { servesCountries: [...new Set(body.serves_countries)] } : {}),
+    ...(body.priority !== undefined ? { priority: body.priority } : {}),
+    ...(body.cost_storage_per_gb_month !== undefined ? { costStoragePerGbMonth: body.cost_storage_per_gb_month } : {}),
+    ...(body.cost_egress_per_gb !== undefined ? { costEgressPerGb: body.cost_egress_per_gb } : {}),
+    ...(body.cost_per_million_requests !== undefined ? { costPerMillionRequests: body.cost_per_million_requests } : {}),
+  };
+}
+
 async function testConfig(config: ProviderConfig): Promise<void> {
   if (config.kind === 'LOCAL') {
     // Local providers may only live beneath the configured base directory.
@@ -63,6 +84,15 @@ async function providerSummaries() {
         available: cap.available,
         used: Number(u?._sum.size ?? 0),
         file_count: u?._count._all ?? 0,
+        region: p.region,
+        serves_countries: p.servesCountries,
+        priority: p.priority,
+        cost_storage_per_gb_month: p.costStoragePerGbMonth,
+        cost_egress_per_gb: p.costEgressPerGb,
+        cost_per_million_requests: p.costPerMillionRequests,
+        health_status: p.healthStatus,
+        health_checked_at: p.healthCheckedAt?.toISOString() ?? null,
+        latency_ms: p.latencyMs,
         created_at: p.createdAt.toISOString(),
         updated_at: p.updatedAt.toISOString(),
       };
@@ -126,7 +156,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
     auth: 'session',
     permission: 'storage.manage',
     requireReauth: true,
-    body: z.object({ name: z.string().trim().min(1).max(100), config: ProviderConfigSchema, capacity: z.number().int().positive().nullable().optional() }),
+    body: z.object({ name: z.string().trim().min(1).max(100), config: ProviderConfigSchema, capacity: z.number().int().positive().nullable().optional(), ...placement }),
     responses: { 201: { description: 'Created provider' } },
     errors: ['validation_failed', 'conflict', 'reauthentication_required'],
     async handler({ req, reply, body }) {
@@ -142,6 +172,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
           configEnc: encryptProviderConfig(id, body.config),
           publicInfo: publicInfoFor(body.config),
           capacity: body.capacity ? BigInt(body.capacity) : null,
+          ...placementData(body),
         },
       });
       await audit(actorOf(req), 'STORAGE_PROVIDER_CREATED', { type: 'storage_provider', id }, { name: body.name, kind: body.config.kind, ...publicInfoFor(body.config) });
@@ -166,6 +197,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
         is_default: z.literal(true).optional(),
         capacity: z.number().int().positive().nullable().optional(),
         config: ProviderConfigSchema.optional(),
+        ...placement,
       })
       .strict(),
     responses: { 200: { description: 'Updated provider' } },
@@ -189,6 +221,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
             ...(body.is_default ? { isDefault: true, enabled: true } : {}),
             ...(body.capacity !== undefined ? { capacity: body.capacity ? BigInt(body.capacity) : null } : {}),
             ...(body.config ? { configEnc: encryptProviderConfig(p.id, body.config), publicInfo: publicInfoFor(body.config) } : {}),
+            ...placementData(body),
           },
         });
       });

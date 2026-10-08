@@ -20,32 +20,34 @@ enum UserStatus {
 }
 
 model User {
-  id                    String     @id
-  email                 String     @unique
-  name                  String
+  id                String     @id
+  email             String     @unique
+  name              String
   /// Argon2id hash. Null until an invited user accepts their invitation.
-  passwordHash          String?
-  status                UserStatus @default(ACTIVE)
+  passwordHash      String?
+  status            UserStatus @default(ACTIVE)
   /// AES-256-GCM encrypted TOTP secret (enc.v1 format).
-  totpSecretEnc         String?
-  totpEnabled           Boolean    @default(false)
-  requireTwoFactor      Boolean    @default(false)
-  lastLoginAt           DateTime?
-  lastLoginIp           String?
-  passwordChangedAt     DateTime?
-  createdById           String?
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  totpSecretEnc     String?
+  totpEnabled       Boolean    @default(false)
+  requireTwoFactor  Boolean    @default(false)
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  passwordChangedAt DateTime?
+  createdById       String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  roles          UserRole[]
-  sessions       Session[]
-  recoveryCodes  RecoveryCode[]
-  tokens         UserToken[]
-  apiKeys        ApiKey[]       @relation("ApiKeyCreator")
-  files          File[]         @relation("FileUploader")
-  folders        Folder[]       @relation("FolderCreator")
-  uploads        Upload[]
-  auditLogs      AuditLog[]
+  roles         UserRole[]
+  sessions      Session[]
+  recoveryCodes RecoveryCode[]
+  tokens        UserToken[]
+  apiKeys       ApiKey[]             @relation("ApiKeyCreator")
+  files         File[]               @relation("FileUploader")
+  folders       Folder[]             @relation("FolderCreator")
+  uploads       Upload[]
+  auditLogs     AuditLog[]
+  passkeys      WebAuthnCredential[]
+  identities    UserIdentity[]
 
   @@index([status])
 }
@@ -90,22 +92,22 @@ model UserRole {
 }
 
 model Session {
-  id             String    @id
-  userId         String
+  id          String    @id
+  userId      String
   /// SHA-256 of the session token. The raw token only lives in the user's cookie.
-  tokenHash      String    @unique
-  ip             String?
-  userAgent      String?
-  rememberMe     Boolean   @default(false)
+  tokenHash   String    @unique
+  ip          String?
+  userAgent   String?
+  rememberMe  Boolean   @default(false)
   /// Set when the user completed 2FA (or 2FA is not enabled).
-  mfaVerified    Boolean   @default(true)
+  mfaVerified Boolean   @default(true)
   /// Last successful password re-authentication, for step-up protected actions.
-  reauthAt       DateTime?
-  lastSeenAt     DateTime  @default(now())
-  expiresAt      DateTime
-  revokedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reauthAt    DateTime?
+  lastSeenAt  DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
@@ -176,17 +178,27 @@ model ApiKey {
   lastUsedIp       String?
   requestCount     BigInt            @default(0)
   rotatedFromId    String?
+  /// Restricts the key to the zones (root folders) of one project.
+  projectId        String?
+  /// Machine identity owning the key (no human creator).
+  serviceAccountId String?
+  /// Set by automated abuse detection; the key is rejected until an administrator re-enables it.
+  suspendedAt      DateTime?
+  suspendedReason  String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  createdBy   User?          @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  scopes      ApiKeyScope[]
-  requests    FileRequest[]
-  uploads     Upload[]
-  files       File[]         @relation("FileApiKey")
+  createdBy      User?           @relation("ApiKeyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  project        Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  serviceAccount ServiceAccount? @relation(fields: [serviceAccountId], references: [id], onDelete: Cascade)
+  scopes         ApiKeyScope[]
+  requests       FileRequest[]
+  uploads        Upload[]
+  files          File[]          @relation("FileApiKey")
 
   @@index([prefix])
   @@index([enabled, revokedAt])
+  @@index([projectId])
 }
 
 model ApiKeyScope {
@@ -208,21 +220,38 @@ enum StorageKind {
 }
 
 model StorageProvider {
-  id          String      @id
-  name        String      @unique
-  kind        StorageKind
+  id                     String        @id
+  name                   String        @unique
+  kind                   StorageKind
   /// AES-256-GCM encrypted JSON configuration (credentials included). AAD = provider id.
-  configEnc   String
+  configEnc              String
   /// Non-sensitive summary for display (bucket, endpoint, path).
-  publicInfo  Json        @default("{}")
-  isDefault   Boolean     @default(false)
-  enabled     Boolean     @default(true)
+  publicInfo             Json          @default("{}")
+  isDefault              Boolean       @default(false)
+  enabled                Boolean       @default(true)
   /// Optional soft capacity in bytes for capacity dashboards / quotas.
-  capacity    BigInt?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  files       File[]
-  uploads     Upload[]
+  capacity               BigInt?
+  /// Free-form region label, e.g. "au-hobart", "au-sydney", "us-east".
+  region                 String        @default("")
+  /// ISO country codes preferentially served from this provider (NEAREST replication strategy).
+  servesCountries        String[]      @default([])
+  /// Lower = preferred when several healthy replicas exist.
+  priority               Int           @default(100)
+  /// Cost model for usage estimates (USD).
+  costStoragePerGbMonth  Float         @default(0)
+  costEgressPerGb        Float         @default(0)
+  costPerMillionRequests Float         @default(0)
+  /// Updated by the periodic provider health check.
+  healthStatus           String        @default("unknown")
+  healthCheckedAt        DateTime?
+  latencyMs              Int?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  files                  File[]
+  uploads                Upload[]
+  zones                  Zone[]
+  replicas               FileReplica[]
+  versions               FileVersion[]
 }
 
 enum Visibility {
@@ -242,70 +271,90 @@ enum FileStatus {
 }
 
 model Folder {
-  id           String      @id
-  name         String
+  id                  String      @id
+  name                String
   /// URL slug used for friendly paths
-  slug         String
-  parentId     String?
+  slug                String
+  parentId            String?
   /// Materialised slug path, e.g. "/images/icons" (used for friendly URLs and subtree queries).
-  path         String      @unique
+  path                String      @unique
   /// Folder default visibility for new files; null = inherit
-  visibility   Visibility?
+  visibility          Visibility?
   /// Folder-level permission override: if set, staff need this permission in addition (e.g. "files.download").
-  restrictedToRoleIds String[] @default([])
-  createdById  String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  restrictedToRoleIds String[]    @default([])
+  createdById         String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   parent    Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Restrict)
   children  Folder[] @relation("FolderTree")
   files     File[]
+  zone      Zone?
   createdBy User?    @relation("FolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([parentId, slug])
 }
 
 model File {
-  id                 String       @id
+  id                 String     @id
   name               String
   /// URL slug for friendly paths, unique per folder
   slug               String
   folderId           String?
   mimeType           String
   /// Extension from the normalised name (informational only)
-  extension          String       @default("")
+  extension          String     @default("")
   size               BigInt
   sha256             String?
   storageProviderId  String
   storageKey         String
-  visibility         Visibility   @default(PRIVATE)
-  status             FileStatus   @default(UPLOADING)
+  visibility         Visibility @default(PRIVATE)
+  status             FileStatus @default(UPLOADING)
   statusReason       String?
   /// Explicit Cache-Control override; null = settings default
   cacheControl       String?
   /// Always serve with Content-Disposition: attachment
-  forceDownload      Boolean      @default(false)
+  forceDownload      Boolean    @default(false)
   width              Int?
   height             Int?
   durationSeconds    Float?
   /// Custom metadata (metadata:write scope)
-  metadata           Json         @default("{}")
+  metadata           Json       @default("{}")
   uploadedById       String?
   uploadedByApiKeyId String?
-  downloadCount      BigInt       @default(0)
-  bandwidthBytes     BigInt       @default(0)
+  downloadCount      BigInt     @default(0)
+  bandwidthBytes     BigInt     @default(0)
   lastAccessedAt     DateTime?
   scannedAt          DateTime?
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  /// Cache tags used for targeted purges, e.g. "project:sentinel", "release:v2".
+  cacheTags          String[]   @default([])
+  /// Current content revision (see FileVersion for previous revisions).
+  version            Int        @default(1)
+  /// Set when the file is in the recycle bin.
+  deletedAt          DateTime?
+  deletedById        String?
+  /// Automatic expiry (moved to the recycle bin by the lifecycle worker).
+  expiresAt          DateTime?
+  /// "standard" or "archive" (moved to cold storage by a lifecycle rule).
+  storageClass       String     @default("standard")
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
-  folder           Folder?         @relation(fields: [folderId], references: [id], onDelete: Restrict)
-  storageProvider  StorageProvider @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
-  uploadedBy       User?           @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
-  uploadedByApiKey ApiKey?         @relation("FileApiKey", fields: [uploadedByApiKeyId], references: [id], onDelete: SetNull)
+  folder           Folder?          @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  storageProvider  StorageProvider  @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
+  uploadedBy       User?            @relation("FileUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedByApiKey ApiKey?          @relation("FileApiKey", fields: [uploadedByApiKeyId], references: [id], onDelete: SetNull)
   requests         FileRequest[]
+  versions         FileVersion[]
+  replicas         FileReplica[]
+  variants         ImageVariant[]
+  renditions       MediaRendition[]
+  shareLinks       ShareLink[]
 
   @@index([folderId, createdAt])
+  @@index([deletedAt])
+  @@index([expiresAt])
+  @@index([cacheTags], type: Gin)
   @@index([folderId, slug])
   @@index([sha256])
   @@index([status])
@@ -325,26 +374,26 @@ enum UploadStatus {
 
 /// Chunked / resumable upload session.
 model Upload {
-  id                String          @id
+  id                String       @id
   filename          String
   mimeType          String?
   totalSize         BigInt
   chunkSize         Int
   totalChunks       Int
-  receivedChunks    Int[]           @default([])
-  receivedBytes     BigInt          @default(0)
+  receivedChunks    Int[]        @default([])
+  receivedBytes     BigInt       @default(0)
   expectedSha256    String?
   folderId          String?
   visibility        Visibility?
   storageProviderId String
-  status            UploadStatus    @default(PENDING)
+  status            UploadStatus @default(PENDING)
   error             String?
   fileId            String?
   userId            String?
   apiKeyId          String?
   expiresAt         DateTime
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   storageProvider StorageProvider @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
   user            User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -357,24 +406,28 @@ model Upload {
 
 /// Raw delivery/API request log (pruned according to the retention setting).
 model FileRequest {
-  id           BigInt   @id @default(autoincrement())
-  timestamp    DateTime @default(now())
-  fileId       String?
-  folderId     String?
-  apiKeyId     String?
-  method       String
-  route        String
-  statusCode   Int
-  bytesSent    BigInt   @default(0)
-  responseMs   Int
-  mimeType     String?
-  country      String?
+  id          BigInt   @id @default(autoincrement())
+  timestamp   DateTime @default(now())
+  fileId      String?
+  folderId    String?
+  apiKeyId    String?
+  method      String
+  route       String
+  statusCode  Int
+  bytesSent   BigInt   @default(0)
+  responseMs  Int
+  mimeType    String?
+  country     String?
   /// Truncated / anonymised according to privacy settings
-  ip           String?
-  userAgent    String?
+  ip          String?
+  userAgent   String?
   /// "delivery" for CDN file serving, "api" for REST API calls
-  kind         String   @default("delivery")
-  cacheStatus  String?
+  kind        String   @default("delivery")
+  cacheStatus String?
+  zoneId      String?
+  projectId   String?
+  /// CPU time spent on image transformations / processing
+  cpuMs       Int?
 
   file   File?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
   apiKey ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
@@ -384,6 +437,9 @@ model FileRequest {
   @@index([apiKeyId, timestamp])
   @@index([kind, timestamp])
   @@index([statusCode, timestamp])
+  @@index([zoneId, timestamp])
+  @@index([projectId, timestamp])
+  @@index([country, timestamp])
 }
 
 /// Daily rollups, retained long after raw FileRequest rows are pruned.
@@ -464,10 +520,13 @@ model Webhook {
   secretEnc   String
   events      String[]
   enabled     Boolean           @default(true)
+  /// Only events for this project's zones are delivered; null = all events.
+  projectId   String?
   createdById String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   deliveries  WebhookDelivery[]
+  project     Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 enum WebhookDeliveryStatus {
@@ -494,4 +553,499 @@ model WebhookDelivery {
 
   @@index([webhookId, createdAt])
   @@index([status])
+}
+
+// ─── Projects, zones & custom domains ──────────────────────────────────────
+
+/// Top-level grouping (e.g. "Sentinel", "Cache Networks") that owns zones, API keys and webhooks.
+model Project {
+  id              String           @id
+  name            String           @unique
+  slug            String           @unique
+  description     String           @default("")
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  zones           Zone[]
+  apiKeys         ApiKey[]
+  serviceAccounts ServiceAccount[]
+  webhooks        Webhook[]
+}
+
+enum ReplicationStrategy {
+  /// Serve from the primary provider only (replicas are backups).
+  PRIMARY_ONLY
+  /// Copy every file to all replica providers; serve from the primary.
+  MIRROR
+  /// Serve from the healthy replica closest to the visitor country.
+  NEAREST
+  /// Serve from the primary; fall back to replicas when it is unavailable.
+  FAILOVER
+}
+
+/// A CDN zone: a delivery configuration bound to a folder subtree and one or more hostnames.
+model Zone {
+  id                      String              @id
+  projectId               String
+  name                    String
+  slug                    String              @unique
+  /// Files in this folder subtree belong to the zone; custom domains resolve paths relative to it.
+  rootFolderId            String?             @unique
+  /// Storage provider for new uploads into the zone (null = global default).
+  storageProviderId       String?
+  enabled                 Boolean             @default(true)
+  /// MIME patterns accepted for uploads into the zone (empty = global setting).
+  allowedMimeTypes        String[]            @default([])
+  maxFileSize             BigInt?
+  defaultVisibility       Visibility?
+  /// Shared-cache (CDN edge) TTL in seconds, sent as CDN-Cache-Control.
+  edgeTtl                 Int                 @default(31536000)
+  /// Browser TTL in seconds, sent as Cache-Control max-age.
+  browserTtl              Int                 @default(86400)
+  imageOptimization       Boolean             @default(true)
+  /// Require an HMAC signature on image transformation URLs (prevents unlimited variants).
+  requireSignedTransforms Boolean             @default(true)
+  videoProcessing         Boolean             @default(false)
+  /// Hotlink protection: allowed Referer hosts (supports "*.example.com"); empty = any.
+  allowedReferrers        String[]            @default([])
+  allowEmptyReferrer      Boolean             @default(true)
+  /// Geo restrictions (ISO 3166-1 alpha-2). allowedCountries non-empty = allowlist.
+  allowedCountries        String[]            @default([])
+  blockedCountries        String[]            @default([])
+  blockedAsns             Int[]               @default([])
+  replicationStrategy     ReplicationStrategy @default(PRIMARY_ONLY)
+  replicaProviderIds      String[]            @default([])
+  /// Cloudflare zone for edge purges / cache analytics; the API token is AES-256-GCM encrypted.
+  cloudflareZoneId        String?
+  cloudflareTokenEnc      String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  rootFolder      Folder?          @relation(fields: [rootFolderId], references: [id], onDelete: SetNull)
+  storageProvider StorageProvider? @relation(fields: [storageProviderId], references: [id], onDelete: SetNull)
+  domains         ZoneDomain[]
+  cacheRules      CacheRule[]
+  securityRules   SecurityRule[]
+  lifecycleRules  LifecycleRule[]
+  purges          CachePurge[]
+
+  @@index([projectId])
+}
+
+enum DomainStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+model ZoneDomain {
+  id                String       @id
+  zoneId            String
+  hostname          String       @unique
+  /// Value expected in the TXT record _cdnpanel-challenge.<hostname>
+  verificationToken String
+  status            DomainStatus @default(PENDING)
+  verifiedAt        DateTime?
+  /// unknown | active | error (HTTPS reachability through the edge)
+  tlsStatus         String       @default("unknown")
+  /// unknown | healthy | unhealthy
+  healthStatus      String       @default("unknown")
+  lastCheckedAt     DateTime?
+  lastError         String?
+  isPrimary         Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  zone              Zone         @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+}
+
+model CacheRule {
+  id         String   @id
+  zoneId     String
+  name       String
+  /// Glob matched against the zone-relative path, e.g. "/images/*" or "*.css".
+  pattern    String
+  edgeTtl    Int?
+  browserTtl Int?
+  /// Never cache at the edge (Cache-Control: private, no-store).
+  bypass     Boolean  @default(false)
+  priority   Int      @default(100)
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  zone       Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId, priority])
+}
+
+model CachePurge {
+  id             String    @id
+  zoneId         String?
+  /// url | file | folder | tag | zone | everything
+  type           String
+  targets        String[]
+  /// pending | completed | partial | failed | origin_only
+  status         String    @default("pending")
+  edgeResult     Json      @default("{}")
+  createdById    String?
+  createdByLabel String?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  zone           Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+}
+
+// ─── Revisions, replicas, transformations, media ────────────────────────────
+
+/// Previous content revisions of a file (the current revision lives on File).
+model FileVersion {
+  id                String          @id
+  fileId            String
+  version           Int
+  name              String
+  mimeType          String
+  size              BigInt
+  sha256            String?
+  storageProviderId String
+  storageKey        String
+  width             Int?
+  height            Int?
+  durationSeconds   Float?
+  createdById       String?
+  createdByApiKeyId String?
+  /// When this revision was originally uploaded.
+  uploadedAt        DateTime
+  createdAt         DateTime        @default(now())
+  file              File            @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  storageProvider   StorageProvider @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
+
+  @@unique([fileId, version])
+  @@index([storageProviderId, storageKey])
+}
+
+enum ReplicaStatus {
+  PENDING
+  SYNCED
+  FAILED
+  MISSING
+}
+
+model FileReplica {
+  id                String          @id
+  fileId            String
+  storageProviderId String
+  storageKey        String
+  /// sha256 of the replicated content (detects stale replicas after a replacement)
+  sha256            String?
+  status            ReplicaStatus   @default(PENDING)
+  error             String?
+  attempts          Int             @default(0)
+  syncedAt          DateTime?
+  lastCheckedAt     DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  file              File            @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  storageProvider   StorageProvider @relation(fields: [storageProviderId], references: [id], onDelete: Restrict)
+
+  @@unique([fileId, storageProviderId])
+  @@index([status])
+  @@index([storageProviderId, storageKey])
+}
+
+/// Cached output of an image transformation, keyed by source content + canonical parameters.
+model ImageVariant {
+  id                String   @id
+  fileId            String
+  paramsHash        String
+  params            Json
+  storageProviderId String
+  storageKey        String
+  mimeType          String
+  size              BigInt
+  width             Int
+  height            Int
+  hits              BigInt   @default(0)
+  lastAccessedAt    DateTime @default(now())
+  createdAt         DateTime @default(now())
+  file              File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, paramsHash])
+}
+
+enum RenditionStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model MediaRendition {
+  id                String          @id
+  fileId            String
+  /// thumbnail | preview | mp4_h264 | mp4_h265 | webm_av1 | hls | dash | audio | waveform
+  kind              String
+  status            RenditionStatus @default(PENDING)
+  error             String?
+  storageProviderId String
+  /// Object key, or key prefix for multi-file renditions (HLS / DASH)
+  storageKey        String
+  /// Entry object for multi-file renditions (e.g. master.m3u8)
+  entry             String?
+  mimeType          String?
+  size              BigInt          @default(0)
+  width             Int?
+  height            Int?
+  durationSeconds   Float?
+  metadata          Json            @default("{}")
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  file              File            @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, kind])
+  @@index([status])
+}
+
+// ─── Share links ────────────────────────────────────────────────────────────
+
+model ShareLink {
+  id                String        @id
+  fileId            String
+  /// SHA-256 of the URL token; the raw token only exists in the link.
+  tokenHash         String        @unique
+  tokenPrefix       String
+  title             String?
+  message           String?
+  /// Argon2id hash of the optional password.
+  passwordHash      String?
+  expiresAt         DateTime?
+  maxDownloads      Int?
+  downloadCount     Int           @default(0)
+  /// Revoke automatically after the first download.
+  oneTime           Boolean       @default(false)
+  allowedIps        String[]      @default([])
+  allowedCountries  String[]      @default([])
+  requireEmail      Boolean       @default(false)
+  revokedAt         DateTime?
+  lastAccessedAt    DateTime?
+  createdById       String?
+  createdByApiKeyId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  file              File          @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  accesses          ShareAccess[]
+
+  @@index([fileId])
+}
+
+model ShareAccess {
+  id          String    @id
+  shareLinkId String
+  timestamp   DateTime  @default(now())
+  email       String?
+  ip          String?
+  country     String?
+  userAgent   String?
+  downloaded  Boolean   @default(false)
+  share       ShareLink @relation(fields: [shareLinkId], references: [id], onDelete: Cascade)
+
+  @@index([shareLinkId, timestamp])
+}
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
+
+enum LifecycleAction {
+  /// Move to the recycle bin
+  TRASH
+  /// Delete permanently
+  DELETE
+  /// Move to the target (cold) provider and mark as archived
+  ARCHIVE
+  /// Move to the target provider
+  MOVE_STORAGE
+}
+
+model LifecycleRule {
+  id                      String          @id
+  name                    String
+  /// Scope: a zone, a folder subtree, or (both null) every file.
+  zoneId                  String?
+  folderId                String?
+  /// "created" or "last_accessed"
+  basis                   String          @default("created")
+  afterDays               Int
+  action                  LifecycleAction
+  targetStorageProviderId String?
+  /// Optional MIME prefix filter, e.g. "video/"
+  mimePrefix              String?
+  enabled                 Boolean         @default(true)
+  lastRunAt               DateTime?
+  lastRunCount            Int             @default(0)
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  zone                    Zone?           @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+}
+
+// ─── Edge security ──────────────────────────────────────────────────────────
+
+enum SecurityRuleAction {
+  ALLOW
+  BLOCK
+  CHALLENGE
+  BAN
+  LOG
+}
+
+/// WAF-style rule: when every condition matches, the action is applied.
+model SecurityRule {
+  id         String             @id
+  /// null = applies to every delivery request
+  zoneId     String?
+  name       String
+  /// [{ "field": "country", "op": "eq", "value": "CN" }, { "field": "requests_per_minute", "op": "gt", "value": 500 }]
+  conditions Json
+  action     SecurityRuleAction
+  banMinutes Int?
+  priority   Int                @default(100)
+  enabled    Boolean            @default(true)
+  hits       BigInt             @default(0)
+  lastHitAt  DateTime?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  zone       Zone?              @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([priority])
+}
+
+model IpBan {
+  id          String    @id
+  /// Single IP or CIDR
+  cidr        String
+  reason      String
+  /// manual | rule | abuse
+  source      String    @default("manual")
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt])
+}
+
+// ─── Passkeys & SSO ─────────────────────────────────────────────────────────
+
+model WebAuthnCredential {
+  id           String    @id
+  userId       String
+  /// base64url credential id
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  name         String
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum SsoKind {
+  OIDC
+  GOOGLE
+  GITHUB
+  DISCORD
+}
+
+model SsoProvider {
+  id              String         @id
+  name            String         @unique
+  slug            String         @unique
+  kind            SsoKind
+  clientId        String
+  /// AES-256-GCM encrypted client secret
+  clientSecretEnc String
+  /// OIDC issuer URL (discovery). Ignored for GitHub / Discord.
+  issuer          String?
+  scopes          String[]       @default([])
+  enabled         Boolean        @default(true)
+  /// Create staff accounts on first sign-in (with defaultRoleId) instead of only linking existing ones.
+  autoProvision   Boolean        @default(false)
+  defaultRoleId   String?
+  /// Only allow these email domains (empty = any).
+  allowedDomains  String[]       @default([])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  identities      UserIdentity[]
+}
+
+model UserIdentity {
+  id          String      @id
+  userId      String
+  providerId  String
+  subject     String
+  email       String?
+  lastLoginAt DateTime?
+  createdAt   DateTime    @default(now())
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    SsoProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, subject])
+  @@index([userId])
+}
+
+// ─── Usage quotas ───────────────────────────────────────────────────────────
+
+model Quota {
+  id             String   @id
+  /// global | project | zone | api_key
+  scopeType      String
+  scopeId        String   @default("")
+  /// storage_bytes | egress_bytes | requests | transforms | upload_bytes
+  metric         String
+  limit          BigInt
+  /// Hard limits block further usage; soft limits only alert.
+  hard           Boolean  @default(false)
+  thresholds     Int[]    @default([50, 75, 90, 100])
+  /// Highest threshold already alerted in the current period.
+  alertedPercent Int      @default(0)
+  /// Start of the current (monthly) period.
+  periodStart    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([scopeType, scopeId, metric])
+}
+
+// ─── Developer platform ─────────────────────────────────────────────────────
+
+/// A non-human identity that owns API keys (CI pipelines, bots, other services).
+model ServiceAccount {
+  id          String   @id
+  name        String   @unique
+  description String   @default("")
+  projectId   String?
+  enabled     Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  apiKeys     ApiKey[]
+}
+
+model ApiKeyTemplate {
+  id               String            @id
+  name             String            @unique
+  description      String            @default("")
+  scopes           String[]
+  rateLimit        Int?
+  ipRestrictions   String[]          @default([])
+  allowedEndpoints String[]          @default([])
+  expiresInDays    Int?
+  environment      ApiKeyEnvironment @default(LIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 }

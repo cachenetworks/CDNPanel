@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Transform, type Readable, type TransformCallback } from 'node:stream';
-import { getPrisma, Prisma, type File, type Visibility } from '@cdn/database';
+import { getPrisma, Prisma, type File, type StorageProvider, type Visibility } from '@cdn/database';
 import { objectKeyForFile } from '@cdn/storage';
 import {
   AppError,
@@ -15,13 +15,17 @@ import {
 import { env } from '../config/env.js';
 import { getSettings } from '../lib/settings.js';
 import { driverFor, uploadProvider } from '../lib/storageRegistry.js';
-import { sniffContent, SNIFF_BYTES } from '../lib/sniff.js';
+import { sniffContent, SNIFF_BYTES, type SniffResult } from '../lib/sniff.js';
 import { inheritedVisibility } from '../lib/folders.js';
 import { enqueueFileProcessing } from '../lib/queue.js';
 import { emitWebhookEvent } from '../lib/webhooks.js';
 import { audit, type AuditContext } from '../lib/audit.js';
 import { scannerFromEnv } from '../lib/scanner.js';
 import { FILE_INCLUDE, serializeFile } from '../lib/serialize.js';
+import { zoneForFolder, type ZoneWithRelations } from '../lib/zones.js';
+import { assertUploadQuota } from './usage.js';
+import { purgeVariants } from './images.js';
+import { autoPurgeFiles } from './purge.js';
 
 /** Pass-through stream that hashes, counts and captures the first bytes for sniffing. */
 class Inspector extends Transform {
@@ -64,6 +68,9 @@ export interface IngestInput {
   cacheControl?: string | null;
   forceDownload?: boolean;
   metadata?: Record<string, unknown>;
+  cacheTags?: string[];
+  /** Move the file to the recycle bin automatically after this date. */
+  expiresAt?: Date | null;
   expectedSha256?: string | null;
   userId: string | null;
   apiKeyId: string | null;
@@ -72,7 +79,14 @@ export interface IngestInput {
   storageProviderId?: string;
 }
 
-export async function assertUploadAllowed(filename: string, declaredSize?: number): Promise<{ name: string; maxSize: number }> {
+export interface UploadContext {
+  folderId: string | null;
+  apiKeyId: string | null;
+  declaredSize?: number;
+}
+
+/** Validates name, extension, size and quotas before any bytes are stored. */
+export async function assertUploadAllowed(filename: string, ctx: UploadContext): Promise<{ name: string; maxSize: number; zone: ZoneWithRelations | null }> {
   const settings = await getSettings();
   let name: string;
   try {
@@ -85,16 +99,19 @@ export async function assertUploadAllowed(filename: string, declaredSize?: numbe
   if (ext && settings.uploads.blockedExtensions.includes(ext)) {
     throw new AppError('unsupported_file_type', `Files with the .${ext} extension are not allowed.`);
   }
-  const maxSize = Math.min(settings.uploads.maxFileSize, env().MAX_UPLOAD_SIZE);
-  if (declaredSize !== undefined && declaredSize > maxSize) throw new AppError('file_too_large');
-  if (settings.uploads.quotaBytes !== null && declaredSize !== undefined) {
+  const zone = await zoneForFolder(ctx.folderId);
+  let maxSize = Math.min(settings.uploads.maxFileSize, env().MAX_UPLOAD_SIZE);
+  if (zone?.maxFileSize) maxSize = Math.min(maxSize, Number(zone.maxFileSize));
+  if (ctx.declaredSize !== undefined && ctx.declaredSize > maxSize) throw new AppError('file_too_large');
+  if (settings.uploads.quotaBytes !== null && ctx.declaredSize !== undefined) {
     const used = await storageUsed();
-    if (used + declaredSize > settings.uploads.quotaBytes) throw new AppError('quota_exceeded');
+    if (used + ctx.declaredSize > settings.uploads.quotaBytes) throw new AppError('quota_exceeded');
   }
+  if (ctx.declaredSize !== undefined) await assertUploadQuota(zone, ctx.apiKeyId, ctx.declaredSize);
   if (settings.uploads.requireMalwareScan && !env().CLAMAV_HOST) {
     throw new AppError('service_unavailable', 'Malware scanning is required but no scanner is configured.');
   }
-  return { name, maxSize };
+  return { name, maxSize, zone };
 }
 
 export async function storageUsed(): Promise<number> {
@@ -124,18 +141,43 @@ export async function uniqueFileSlug(folderId: string | null, name: string, excl
   return `${stem}-${Date.now()}${ext ? `.${ext}` : ''}`;
 }
 
-export async function ingestFile(input: IngestInput): Promise<ReturnType<typeof serializeFile>> {
+export interface StoredUpload {
+  provider: StorageProvider;
+  /** Final object key (an existing object's key when deduplicated). */
+  storageKey: string;
+  sha256: string;
+  size: number;
+  sniff: SniffResult;
+  /** True when an identical, already-verified object was reused. */
+  reused: boolean;
+  /** Deletes the stored object if it was newly written (for rollbacks). */
+  cleanup: () => Promise<void>;
+}
+
+/**
+ * Streams content into storage while hashing and sniffing it, then enforces checksum, size,
+ * MIME allowlists (global + zone) and quotas. Identical content is deduplicated.
+ */
+export async function storeUpload(input: {
+  stream: Readable;
+  name: string;
+  objectId: string;
+  maxSize: number;
+  zone: ZoneWithRelations | null;
+  declaredSize?: number;
+  expectedSha256?: string | null;
+  storageProviderId?: string;
+  apiKeyId: string | null;
+}): Promise<StoredUpload> {
   const settings = await getSettings();
-  const { name, maxSize } = await assertUploadAllowed(input.filename, input.declaredSize);
   const prisma = getPrisma();
   const provider = input.storageProviderId
     ? await prisma.storageProvider.findUniqueOrThrow({ where: { id: input.storageProviderId } })
-    : await uploadProvider(settings.uploads.storageProviderId);
+    : await uploadProvider(input.zone?.storageProviderId ?? settings.uploads.storageProviderId);
   const driver = driverFor(provider);
-  const fileId = newId('file');
-  const storageKey = objectKeyForFile(fileId);
+  const storageKey = objectKeyForFile(input.objectId);
 
-  const inspector = new Inspector(maxSize);
+  const inspector = new Inspector(input.maxSize);
   input.stream.on('error', (err) => inspector.destroy(err));
   // Errors are surfaced through the storage pipeline; avoid a duplicate unhandled 'error' event.
   inspector.on('error', () => undefined);
@@ -149,58 +191,78 @@ export async function ingestFile(input: IngestInput): Promise<ReturnType<typeof 
     if ((input.stream as { truncated?: boolean }).truncated) throw new AppError('file_too_large');
     throw new AppError('storage_error');
   }
-  if ((input.stream as { truncated?: boolean }).truncated || inspector.bytes > maxSize) {
-    await driver.delete(storageKey).catch(() => undefined);
+  const cleanupNew = () => driver.delete(storageKey).catch(() => undefined);
+  if ((input.stream as { truncated?: boolean }).truncated || inspector.bytes > input.maxSize) {
+    await cleanupNew();
     throw new AppError('file_too_large');
   }
 
   const sha256 = inspector.hash.digest('hex');
   const size = inspector.bytes;
-  const cleanup = () => driver.delete(storageKey).catch(() => undefined);
 
   if (input.expectedSha256 && input.expectedSha256.toLowerCase() !== sha256) {
-    await cleanup();
+    await cleanupNew();
     throw new AppError('checksum_mismatch', undefined, { expected: input.expectedSha256.toLowerCase(), actual: sha256 });
   }
   if (input.declaredSize !== undefined && input.declaredSize !== size) {
-    await cleanup();
+    await cleanupNew();
     throw new AppError('validation_failed', `Received ${size} bytes but ${input.declaredSize} were declared.`);
   }
 
-  const sniff = await sniffContent(inspector.head(), name);
-  if (settings.uploads.allowedMimeTypes.length > 0 && !settings.uploads.allowedMimeTypes.some((p) => mimeMatches(p, sniff.mime))) {
-    await cleanup();
-    throw new AppError('unsupported_file_type', `Files of type ${sniff.mime} are not allowed.`);
-  }
-
-  if (settings.uploads.quotaBytes !== null) {
-    const used = await storageUsed();
-    if (used + size > settings.uploads.quotaBytes) {
-      await cleanup();
-      throw new AppError('quota_exceeded');
+  const sniff = await sniffContent(inspector.head(), input.name);
+  const allowLists = [settings.uploads.allowedMimeTypes, input.zone?.allowedMimeTypes ?? []].filter((l) => l.length > 0);
+  for (const list of allowLists) {
+    if (!list.some((p) => mimeMatches(p, sniff.mime))) {
+      await cleanupNew();
+      throw new AppError('unsupported_file_type', `Files of type ${sniff.mime} are not allowed${list === input.zone?.allowedMimeTypes ? ' in this zone' : ''}.`);
     }
   }
 
+  try {
+    if (settings.uploads.quotaBytes !== null && (await storageUsed()) + size > settings.uploads.quotaBytes) throw new AppError('quota_exceeded');
+    await assertUploadQuota(input.zone, input.apiKeyId, size);
+  } catch (err) {
+    await cleanupNew();
+    throw err;
+  }
+
   // Duplicate detection: reuse an existing stored object with the same content.
-  let finalKey = storageKey;
   if (settings.uploads.deduplicate) {
     const dup = await prisma.file.findFirst({
       where: { sha256, size: BigInt(size), storageProviderId: provider.id, status: 'READY' },
       select: { storageKey: true },
     });
-    if (dup) {
-      await cleanup();
-      finalKey = dup.storageKey;
+    if (dup && dup.storageKey !== storageKey) {
+      await cleanupNew();
+      return { provider, storageKey: dup.storageKey, sha256, size, sniff, reused: true, cleanup: async () => undefined };
     }
   }
+  return { provider, storageKey, sha256, size, sniff, reused: false, cleanup: cleanupNew };
+}
+
+export async function ingestFile(input: IngestInput): Promise<ReturnType<typeof serializeFile>> {
+  const settings = await getSettings();
+  const { name, maxSize, zone } = await assertUploadAllowed(input.filename, { folderId: input.folderId, apiKeyId: input.apiKeyId, declaredSize: input.declaredSize });
+  const prisma = getPrisma();
+  const fileId = newId('file');
+  const stored = await storeUpload({
+    stream: input.stream,
+    name,
+    objectId: fileId,
+    maxSize,
+    zone,
+    declaredSize: input.declaredSize,
+    expectedSha256: input.expectedSha256,
+    storageProviderId: input.storageProviderId,
+    apiKeyId: input.apiKeyId,
+  });
 
   const scanRequired = settings.uploads.requireMalwareScan && Boolean(scannerFromEnv(env().CLAMAV_HOST, env().CLAMAV_PORT));
-  const visibility = input.visibility ?? (await inheritedVisibility(input.folderId)) ?? settings.files.defaultVisibility;
+  const visibility = input.visibility ?? (await inheritedVisibility(input.folderId)) ?? zone?.defaultVisibility ?? settings.files.defaultVisibility;
   const slug = await uniqueFileSlug(input.folderId, name);
-  const reusedVerifiedObject = finalKey !== storageKey;
-  const status = scanRequired && !reusedVerifiedObject ? 'SCANNING' : 'READY';
+  const status = scanRequired && !stored.reused ? 'SCANNING' : 'READY';
 
-  let file: File;
+  let file;
   try {
     file = await prisma.file.create({
       data: {
@@ -208,34 +270,127 @@ export async function ingestFile(input: IngestInput): Promise<ReturnType<typeof 
         name,
         slug,
         folderId: input.folderId,
-        mimeType: sniff.mime,
+        mimeType: stored.sniff.mime,
         extension: extensionOf(name),
-        size: BigInt(size),
-        sha256,
-        storageProviderId: provider.id,
-        storageKey: finalKey,
+        size: BigInt(stored.size),
+        sha256: stored.sha256,
+        storageProviderId: stored.provider.id,
+        storageKey: stored.storageKey,
         visibility,
         status,
         cacheControl: input.cacheControl ?? null,
-        forceDownload: input.forceDownload ?? (settings.files.forceDownloadActiveContent && isActiveContentType(sniff.mime)),
-        width: sniff.width ?? null,
-        height: sniff.height ?? null,
+        forceDownload: input.forceDownload ?? (settings.files.forceDownloadActiveContent && isActiveContentType(stored.sniff.mime)),
+        width: stored.sniff.width ?? null,
+        height: stored.sniff.height ?? null,
         metadata: (input.metadata ?? {}) as Prisma.InputJsonValue,
+        cacheTags: normalizeTags(input.cacheTags),
+        expiresAt: input.expiresAt ?? null,
         uploadedById: input.userId,
         uploadedByApiKeyId: input.apiKeyId,
-        scannedAt: reusedVerifiedObject && scanRequired ? new Date() : null,
+        scannedAt: stored.reused && scanRequired ? new Date() : null,
       },
       include: FILE_INCLUDE,
     });
   } catch (err) {
-    if (finalKey === storageKey) await cleanup();
+    await stored.cleanup();
     throw err;
   }
 
-  await audit(input.actor, 'FILE_UPLOAD', { type: 'file', id: file.id }, { name, size, mime: sniff.mime, sha256, folder_id: input.folderId, deduplicated: reusedVerifiedObject });
-  // Background processing: malware scan (if required) and media metadata extraction.
+  await audit(input.actor, 'FILE_UPLOAD', { type: 'file', id: file.id }, { name, size: stored.size, mime: stored.sniff.mime, sha256: stored.sha256, folder_id: input.folderId, zone_id: zone?.id, deduplicated: stored.reused });
+  // Background processing: malware scan (if required), media metadata, renditions, replication.
   await enqueueFileProcessing(file.id);
   const serialized = serializeFile(file);
-  if (status === 'READY') await emitWebhookEvent('file.uploaded', { file: serialized });
+  if (status === 'READY') await emitWebhookEvent('file.uploaded', { file: serialized }, { projectId: zone?.projectId });
   return serialized;
+}
+
+/**
+ * Replaces the content of an existing file. The current content becomes a FileVersion
+ * (revision history), the file keeps its id and URLs, and edge caches are purged.
+ */
+export async function replaceFileContent(
+  file: File,
+  input: { stream: Readable; filename?: string; declaredSize?: number; expectedSha256?: string | null; userId: string | null; apiKeyId: string | null; actor: AuditContext },
+): Promise<File> {
+  const settings = await getSettings();
+  const { name, maxSize, zone } = await assertUploadAllowed(input.filename ?? file.name, { folderId: file.folderId, apiKeyId: input.apiKeyId, declaredSize: input.declaredSize });
+  const prisma = getPrisma();
+  const stored = await storeUpload({
+    stream: input.stream,
+    name,
+    objectId: newId('fileVersion'),
+    maxSize,
+    zone,
+    declaredSize: input.declaredSize,
+    expectedSha256: input.expectedSha256,
+    apiKeyId: input.apiKeyId,
+  });
+  const scanRequired = settings.uploads.requireMalwareScan && Boolean(scannerFromEnv(env().CLAMAV_HOST, env().CLAMAV_PORT));
+  let updated: File;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      await tx.fileVersion.create({
+        data: {
+          id: newId('fileVersion'),
+          fileId: file.id,
+          version: file.version,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          sha256: file.sha256,
+          storageProviderId: file.storageProviderId,
+          storageKey: file.storageKey,
+          width: file.width,
+          height: file.height,
+          durationSeconds: file.durationSeconds,
+          createdById: file.uploadedById,
+          createdByApiKeyId: file.uploadedByApiKeyId,
+          uploadedAt: file.updatedAt,
+        },
+      });
+      return tx.file.update({
+        where: { id: file.id },
+        data: {
+          name,
+          slug: name === file.name ? file.slug : await uniqueFileSlug(file.folderId, name, file.id),
+          extension: extensionOf(name),
+          mimeType: stored.sniff.mime,
+          size: BigInt(stored.size),
+          sha256: stored.sha256,
+          storageProviderId: stored.provider.id,
+          storageKey: stored.storageKey,
+          width: stored.sniff.width ?? null,
+          height: stored.sniff.height ?? null,
+          durationSeconds: null,
+          version: { increment: 1 },
+          // Keep serving while metadata / renditions are rebuilt; only a required malware scan takes the file offline.
+          status: scanRequired && !stored.reused ? 'SCANNING' : file.status,
+          uploadedById: input.userId,
+          uploadedByApiKeyId: input.apiKeyId,
+        },
+      });
+    });
+  } catch (err) {
+    await stored.cleanup();
+    throw err;
+  }
+  // Derived content (variants, renditions, replicas) belongs to the old revision.
+  await purgeVariants(file.id);
+  await prisma.fileReplica.updateMany({ where: { fileId: file.id }, data: { status: 'PENDING', sha256: null } });
+  await audit(input.actor, 'FILE_VERSION_UPLOAD', { type: 'file', id: file.id }, { version: updated.version, previous_sha256: file.sha256, sha256: stored.sha256, size: stored.size });
+  await enqueueFileProcessing(file.id, { reprocess: true });
+  // Same URLs now serve new content: invalidate edge caches.
+  await autoPurgeFiles([file], 'content replaced');
+  return updated;
+}
+
+export function normalizeTags(tags: string[] | undefined): string[] {
+  if (!tags) return [];
+  const out = new Set<string>();
+  for (const t of tags) {
+    const clean = t.trim().toLowerCase();
+    if (/^[a-z0-9][a-z0-9:._/-]{0,99}$/.test(clean)) out.add(clean);
+    if (out.size >= 32) break;
+  }
+  return [...out];
 }

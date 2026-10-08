@@ -44,7 +44,19 @@ export type DocTag =
   | 'Webhooks'
   | 'Dashboard'
   | 'Delivery'
-  | 'Health';
+  | 'Health'
+  | 'Zones'
+  | 'Cache'
+  | 'Images'
+  | 'Media'
+  | 'Shares'
+  | 'Versions'
+  | 'Lifecycle'
+  | 'Edge Security'
+  | 'Single Sign-On'
+  | 'Usage'
+  | 'Service Accounts'
+  | 'Operations';
 
 export interface ResponseDoc {
   description: string;

@@ -158,11 +158,11 @@ export const securityRoutes: RouteDef<any, any, any>[] = [
         take: 20,
       });
       const byType = Object.fromEntries(counts.map((c) => [c.type, c._count._all]));
-      const keyMini = (k: { id: string; name: string; prefix: string; expiresAt: Date | null; revokedAt: Date | null; enabled: boolean; revokedReason: string | null }) => ({
+      const keyMini = (k: { id: string; name: string; prefix: string; expiresAt: Date | null; revokedAt: Date | null; enabled: boolean; revokedReason: string | null; suspendedAt?: Date | null }) => ({
         id: k.id,
         name: k.name,
         prefix: k.prefix,
-        status: apiKeyStatus(k),
+        status: apiKeyStatus({ ...k, suspendedAt: k.suspendedAt ?? null }),
         expires_at: k.expiresAt?.toISOString() ?? null,
         revoked_at: k.revokedAt?.toISOString() ?? null,
         revoked_reason: k.revokedReason,

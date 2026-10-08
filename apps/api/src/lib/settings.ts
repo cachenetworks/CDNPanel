@@ -40,6 +40,45 @@ export const SettingsSchemas = {
     enableFriendlyPaths: z.boolean().default(true),
     signedUrlDefaultExpiry: z.number().int().min(10).max(7 * 24 * 3600).default(3600),
     signedUrlMaxExpiry: z.number().int().min(60).max(30 * 24 * 3600).default(7 * 24 * 3600),
+    /** Deleted files stay in the recycle bin this long before being purged. 0 = delete immediately. */
+    trashRetentionDays: z.number().int().min(0).max(3650).default(30),
+    /** Previous revisions kept per file (older ones are pruned). */
+    maxVersionsPerFile: z.number().int().min(0).max(1000).default(20),
+  }),
+  cache: z.object({
+    /** Edge (shared cache) TTL for public files outside any zone. */
+    defaultEdgeTtl: z.number().int().min(0).max(31536000).default(31536000),
+    /** Browser TTL for public files outside any zone. */
+    defaultBrowserTtl: z.number().int().min(0).max(31536000).default(86400),
+    /** Purge edge caches automatically when a file is replaced, moved, renamed or deleted. */
+    autoPurge: z.boolean().default(true),
+    /** Number of most-requested files pre-warmed by the scheduled pre-warm job (0 = off). */
+    prewarmTopFiles: z.number().int().min(0).max(1000).default(0),
+  }),
+  images: z.object({
+    enabled: z.boolean().default(true),
+    maxWidth: z.number().int().min(16).max(16384).default(4096),
+    maxHeight: z.number().int().min(16).max(16384).default(4096),
+    /** Refuse to decode sources larger than this many pixels (decompression bomb guard). */
+    maxSourcePixels: z.number().int().min(1_000_000).max(1_000_000_000).default(100_000_000),
+    defaultQuality: z.number().int().min(1).max(100).default(80),
+    /** Require signed transformation URLs for files outside a zone. */
+    requireSignedTransforms: z.boolean().default(true),
+    /** Remove EXIF / GPS / ICC metadata (except orientation, which is applied). */
+    stripMetadata: z.boolean().default(true),
+  }),
+  media: z.object({
+    enabled: z.boolean().default(false),
+    renditions: z.array(z.enum(['thumbnail', 'preview', 'mp4_h264', 'mp4_h265', 'webm_av1', 'hls', 'dash', 'audio', 'waveform'])).default(['thumbnail', 'preview', 'hls', 'waveform']),
+    /** HLS / DASH ladder heights (never upscaled beyond the source). */
+    ladder: z.array(z.number().int().min(144).max(4320)).max(6).default([360, 720, 1080]),
+    /** Skip processing for media longer than this. */
+    maxDurationSeconds: z.number().int().min(10).max(86_400).default(4 * 3600),
+  }),
+  usage: z.object({
+    currency: z.string().length(3).default('USD'),
+    /** Emit quota.threshold webhooks when quota thresholds are crossed. */
+    alertWebhooks: z.boolean().default(true),
   }),
   api: z.object({
     defaultKeyRateLimit: z.number().int().min(1).max(100000).default(600),
@@ -60,6 +99,14 @@ export const SettingsSchemas = {
     lockoutThreshold: z.number().int().min(3).max(100).default(8),
     lockoutMinutes: z.number().int().min(1).max(1440).default(15),
     reauthWindowMinutes: z.number().int().min(1).max(60).default(10),
+    /** Suspend API keys automatically after repeated denied / blocked requests. */
+    abuseAutoSuspend: z.boolean().default(true),
+    abuseThreshold: z.number().int().min(5).max(100_000).default(100),
+    abuseWindowMinutes: z.number().int().min(1).max(1440).default(5),
+    /** How long a passed browser challenge is remembered. */
+    challengeTtlMinutes: z.number().int().min(1).max(10_080).default(60),
+    /** Allow password sign-in (disable to require passkeys / SSO). */
+    passwordLoginEnabled: z.boolean().default(true),
   }),
   retention: z.object({
     requestLogDays: z.number().int().min(1).max(3650).default(30),

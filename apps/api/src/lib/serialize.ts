@@ -49,6 +49,11 @@ export function serializeFile(f: FileWithRelations) {
     bandwidth_bytes: n(f.bandwidthBytes),
     last_accessed_at: iso(f.lastAccessedAt),
     scanned_at: iso(f.scannedAt),
+    cache_tags: f.cacheTags,
+    version: f.version,
+    expires_at: iso(f.expiresAt),
+    deleted_at: iso(f.deletedAt),
+    storage_class: f.storageClass,
     created_at: f.createdAt.toISOString(),
     updated_at: f.updatedAt.toISOString(),
     ...fileUrls(f, f.folder ? f.folder.path : f.folderId ? undefined : ''),
@@ -79,10 +84,11 @@ export function serializeFolder(f: Folder & { _count?: { files: number; children
   };
 }
 
-export function apiKeyStatus(k: Pick<ApiKey, 'enabled' | 'revokedAt' | 'expiresAt'>): 'active' | 'disabled' | 'revoked' | 'expired' {
+export function apiKeyStatus(k: Pick<ApiKey, 'enabled' | 'revokedAt' | 'expiresAt' | 'suspendedAt'>): 'active' | 'disabled' | 'revoked' | 'expired' | 'suspended' {
   if (k.revokedAt) return 'revoked';
   if (k.expiresAt && k.expiresAt.getTime() <= Date.now()) return 'expired';
   if (!k.enabled) return 'disabled';
+  if (k.suspendedAt) return 'suspended';
   return 'active';
 }
 
@@ -108,6 +114,10 @@ export function serializeApiKey(k: ApiKey & { scopes: ApiKeyScope[]; createdBy?:
     last_used_ip: k.lastUsedIp,
     request_count: n(k.requestCount),
     rotated_from_id: k.rotatedFromId,
+    project_id: k.projectId,
+    service_account_id: k.serviceAccountId,
+    suspended_at: iso(k.suspendedAt),
+    suspended_reason: k.suspendedReason,
     created_by: k.createdBy ? { id: k.createdBy.id, name: k.createdBy.name, email: k.createdBy.email } : null,
     created_at: k.createdAt.toISOString(),
     updated_at: k.updatedAt.toISOString(),

@@ -73,7 +73,7 @@ async function authenticateApiKey(req: FastifyRequest, reply: FastifyReply, pres
   let key = null;
   for (const version of keyring.versions()) {
     const hash = hashApiKey(keyring, presented, version);
-    const candidate = await prisma.apiKey.findUnique({ where: { keyHash: hash }, include: { scopes: true } });
+    const candidate = await prisma.apiKey.findUnique({ where: { keyHash: hash }, include: { scopes: true, serviceAccount: { select: { enabled: true } } } });
     if (candidate && candidate.hashVersion === version && safeEqual(candidate.keyHash, hash)) {
       key = candidate;
       break;
@@ -91,7 +91,11 @@ async function authenticateApiKey(req: FastifyRequest, reply: FastifyReply, pres
     void securityEvent('EXPIRED_API_KEY', { ip: req.clientIp, apiKeyId: key.id, userAgent: ua, severity: 'info' });
     throw new AppError('api_key_expired');
   }
-  if (!key.enabled) throw new AppError('api_key_disabled');
+  if (!key.enabled || key.serviceAccount?.enabled === false) throw new AppError('api_key_disabled');
+  if (key.suspendedAt) {
+    void securityEvent('API_KEY_SUSPENDED', { ip: req.clientIp, apiKeyId: key.id, userAgent: ua, severity: 'info', details: { rejected: true } });
+    throw new AppError('api_key_suspended');
+  }
   if (key.ipRestrictions.length > 0 && !ipMatchesAny(req.clientIp, key.ipRestrictions)) {
     void securityEvent('API_KEY_IP_BLOCKED', { ip: req.clientIp, apiKeyId: key.id, userAgent: ua });
     throw new AppError('ip_not_allowed');
@@ -107,6 +111,8 @@ async function authenticateApiKey(req: FastifyRequest, reply: FastifyReply, pres
       prefix: key.prefix,
       environment: key.environment,
       allowedEndpoints: key.allowedEndpoints,
+      projectId: key.projectId,
+      serviceAccountId: key.serviceAccountId,
     },
     scopes: new Set(key.scopes.map((s) => s.scope).filter((s): s is ApiScope => isApiScope(s))),
   };

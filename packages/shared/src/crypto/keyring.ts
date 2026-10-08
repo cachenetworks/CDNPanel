@@ -12,7 +12,17 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
  * keeping previous keys available for decryption/verification.
  */
 
-export type KeyPurpose = 'field-encryption' | 'api-key-hash' | 'signed-url' | 'session' | 'csrf' | 'token-hash';
+export type KeyPurpose =
+  | 'field-encryption'
+  | 'api-key-hash'
+  | 'signed-url'
+  | 'session'
+  | 'csrf'
+  | 'token-hash'
+  | 'image-transform'
+  | 'media-token'
+  | 'signed-cookie'
+  | 'challenge';
 
 export interface MasterKeyInput {
   version: number;

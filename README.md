@@ -2,7 +2,8 @@
 
 > A security-focused, self-hosted CDN and file-delivery platform built for people who want control of their storage, delivery, API access, staff permissions, analytics, and infrastructure.
 
-[![Build & publish images](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml/badge.svg)](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml)
+[![CI & images](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml/badge.svg)](https://github.com/cachenetworks/CDNPanel/actions/workflows/docker.yml)
+[![CodeQL](https://github.com/cachenetworks/CDNPanel/actions/workflows/codeql.yml/badge.svg)](https://github.com/cachenetworks/CDNPanel/actions/workflows/codeql.yml)
 ![Node.js](https://img.shields.io/badge/Node.js-22.9%2B-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?logo=postgresql&logoColor=white)
@@ -43,8 +44,32 @@ CDNPanel is intended to be understandable enough to self-host while still having
 
 ---
 
+## What's new in 2.0 — Zones & Edge
+
+2.0 turns CDNPanel from a file panel into a CDN platform. Full guide: **[docs/platform.md](docs/platform.md)**.
+
+| Area | Highlights |
+|---|---|
+| **Projects, zones & custom domains** | Per-zone storage, upload rules, TTLs, security and replication; TXT-verified custom domains with TLS / health checks and an onboarding wizard; project-bound API keys |
+| **Cache management** | Edge vs browser TTLs, cache rules, cache tags, purges (URL / file / folder / tag / zone / everything) via Cloudflare, auto-invalidation, pre-warming, HIT / MISS statistics |
+| **Image optimisation** | `/img/…?w=800&format=auto` — resize, crop, WebP / AVIF, watermarks, EXIF stripping; signed URLs; permanently cached variants |
+| **Video & audio** | FFmpeg thumbnails, previews, MP4 / WebM, HLS / DASH ladders, audio extraction, waveforms |
+| **Replication** | File replicas across providers, health-checked failover, `PRIMARY_ONLY` / `MIRROR` / `NEAREST` / `FAILOVER`, automatic repair |
+| **Share links** | Passwords, expiry, download limits, one-time links, IP / country limits, email capture, access log |
+| **Revisions & lifecycle** | Revisions with rollback, recycle bin, expiry, lifecycle rules (trash / delete / archive / tier) |
+| **Edge security** | WAF-style rules, browser challenges, IP bans, hotlink / geo / ASN blocking, API-key abuse suspension, signed cookies, passkeys, OIDC / Google / GitHub / Discord SSO |
+| **Usage & costs** | Storage, egress, requests and transforms per project / zone / key; soft and hard quotas with alerts; cost estimates |
+| **Developer platform** | Generated TypeScript, Python and Go SDKs, the `cdnctl` CLI, service accounts, key templates, webhook replay |
+| **Operations** | Prometheus `/metrics`, OpenTelemetry traces, latency percentiles, queue browser with retry, Asset Inspector, global delivery map |
+| **Supply chain** | CodeQL, dependency review, `npm audit`, Trivy, SBOMs, Cosign signing, provenance attestations, Dependabot, migration and backup / restore tests |
+
+Upgrading from 1.x is a normal update — see [Upgrading from 1.x](docs/platform.md#upgrading-from-1x) (note: deletes now go to the recycle bin).
+
+---
+
 ## Table of contents
 
+- [What's new in 2.0](#whats-new-in-20--zones--edge)
 - [Feature overview](#feature-overview)
 - [Architecture](#architecture)
 - [Technology stack](#technology-stack)
@@ -300,6 +325,12 @@ packages/
   shared/           errors, IDs, RBAC, crypto, signed URLs, validation
   storage/          local + S3-compatible storage abstraction
   database/         Prisma schema, migrations, seeds
+  sdk-js/           TypeScript SDK (endpoint methods generated from OpenAPI)
+  cli/              cdnctl command-line client
+
+sdks/
+  python/           Python SDK (generated + runtime core)
+  go/               Go SDK (generated + runtime core)
 
 infrastructure/
   docker/           production Dockerfiles
@@ -309,10 +340,14 @@ deploy/
   dockge/           prebuilt-image Dockge stack
 
 docs/
+  platform.md       2.0 guide: zones, cache, images, media, replication, security, SDKs, operations
   backups.md
+  openapi.json      generated API description (source of the SDKs)
 
 scripts/
   backup-postgres.sh
+  test-backup-restore.sh
+  generate-sdks.mjs
 ```
 
 A REST route is declared once in the API route system. The same definition drives request validation, authentication mode, permission/scope enforcement, CSRF requirements, step-up authentication, rate limits, and OpenAPI output.

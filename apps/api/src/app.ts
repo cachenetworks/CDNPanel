@@ -12,6 +12,9 @@ import { recordRequest } from './lib/requestLog.js';
 import { registerAllRoutes } from './routes/index.js';
 import { buildOpenApiDocument } from './http/openapi.js';
 import { isDeliveryPath } from './http/paths.js';
+import { registerAbuseDetection } from './lib/abuse.js';
+import { activeTransfers, bytesSent, cacheStatusTotal, httpDuration } from './lib/metrics.js';
+import { isBanned } from './services/edgeSecurity.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const e = env();
@@ -56,6 +59,11 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Chunk uploads stream the raw body straight to disk.
   app.addContentTypeParser('application/octet-stream', (_req, payload, done) => done(null, payload));
+  // Plain HTML forms (share-link unlock pages).
+  app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 16 * 1024 }, (_req, body, done) => {
+    done(null, Object.fromEntries(new URLSearchParams(body as string)));
+  });
+  registerAbuseDetection();
 
   app.decorateRequest('auth', null);
   app.decorateRequest('clientIp', '');
@@ -68,6 +76,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     req.clientIp = ip;
     req.country = country;
     reply.header('X-Request-Id', req.id);
+    // Incremented before anything can throw: onResponse always decrements.
+    if (isDeliveryPath(req.url)) activeTransfers.inc({ direction: 'out' });
+    else if (req.method === 'POST' && (req.url.startsWith('/api/v1/files') || req.url.startsWith('/api/v1/uploads'))) activeTransfers.inc({ direction: 'in' });
+    // Banned IPs / networks are refused everywhere except health probes.
+    if (!req.url.startsWith('/health') && (await isBanned(ip))) throw new AppError('access_denied', 'Requests from your network are blocked.');
     await globalRateLimit(req, reply);
     await authenticate(req, reply);
   });
@@ -88,6 +101,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.addHook('onResponse', async (req, reply) => {
     const ms = Number(process.hrtime.bigint() - req.startedAt) / 1e6;
+    if (isDeliveryPath(req.url)) activeTransfers.dec({ direction: 'out' });
+    else if (req.method === 'POST' && (req.url.startsWith('/api/v1/files') || req.url.startsWith('/api/v1/uploads'))) activeTransfers.dec({ direction: 'in' });
+    const kind = req.analytics?.kind ?? (req.url.startsWith('/api/') ? 'api' : 'other');
+    httpDuration.observe({ method: req.method, route: req.routeOptions.url ?? 'unmatched', status: `${Math.floor(reply.statusCode / 100)}xx`, kind }, ms / 1000);
+    if (req.analytics?.bytes) bytesSent.inc({ kind }, req.analytics.bytes);
+    if (req.analytics?.cacheStatus) cacheStatusTotal.inc({ status: req.analytics.cacheStatus });
     req.log.info(
       {
         request_id: req.id,
@@ -116,8 +135,11 @@ export async function buildApp(): Promise<FastifyInstance> {
         ip: req.clientIp,
         country: req.country,
         userAgent: req.headers['user-agent'] ?? null,
-        kind: 'delivery',
+        kind: req.analytics.kind ?? 'delivery',
         cacheStatus: req.analytics.cacheStatus ?? null,
+        zoneId: req.analytics.zoneId ?? null,
+        projectId: req.analytics.projectId ?? null,
+        cpuMs: req.analytics.cpuMs ?? null,
       });
     } else if (req.url.startsWith('/api/v1/')) {
       recordRequest({

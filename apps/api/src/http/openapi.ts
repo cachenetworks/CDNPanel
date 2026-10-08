@@ -159,6 +159,18 @@ const TAG_DESCRIPTIONS: Record<string, string> = {
   Dashboard: 'Dashboard aggregates (staff session required).',
   Delivery: 'CDN file delivery endpoints served from the CDN origin.',
   Health: 'Liveness and readiness probes.',
+  Zones: 'Projects, CDN zones, custom domains and replication.',
+  Cache: 'Cache rules, purges, pre-warming and cache statistics.',
+  Images: 'On-the-fly image optimisation with signed transformation URLs.',
+  Media: 'Video / audio renditions: thumbnails, previews, MP4, HLS / DASH, waveforms.',
+  Shares: 'Human-friendly share links with passwords, expiry and download limits.',
+  Versions: 'File revisions, rollback and the recycle bin.',
+  Lifecycle: 'Automatic expiry, archiving and storage tiering rules.',
+  'Edge Security': 'WAF-style security rules, IP bans and signed access cookies.',
+  'Single Sign-On': 'Passkeys (WebAuthn) and OIDC / Google / GitHub / Discord sign-in.',
+  Usage: 'Usage metering, quotas and cost estimates.',
+  'Service Accounts': 'Machine identities and API key templates.',
+  Operations: 'Operational metrics, background job queues and the asset inspector.',
 };
 
 export function buildOpenApiDocument(routes: RouteDef[] = ALL_ROUTES as RouteDef[]) {

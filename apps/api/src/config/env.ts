@@ -86,6 +86,23 @@ const EnvSchema = z
     CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
 
     COOKIE_SECURE: z.string().optional(),
+
+    /** Hostname custom domains should CNAME to (defaults to the CDN_URL host). */
+    DOMAIN_CNAME_TARGET: z.string().optional(),
+    /** Skip DNS/HTTPS checks and mark custom domains active immediately (development only). */
+    DOMAIN_VERIFICATION_DISABLED: bool,
+    /** Global Cloudflare credentials for edge purges / cache analytics (zones may override). */
+    CLOUDFLARE_API_TOKEN: z.string().optional(),
+    CLOUDFLARE_ZONE_ID: z.string().optional(),
+    /** Request header carrying the client ASN, set by a trusted proxy (e.g. a Cloudflare transform rule). */
+    ASN_HEADER: z.string().default(''),
+    FFMPEG_PATH: z.string().default('ffmpeg'),
+    FFPROBE_PATH: z.string().default('ffprobe'),
+    /** Bearer token required for GET /metrics (Prometheus). Empty = metrics only reachable from trusted proxies' networks. */
+    METRICS_TOKEN: z.string().default(''),
+    /** OTLP/HTTP traces endpoint, e.g. http://otel-collector:4318/v1/traces. Tracing is off when empty. */
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
+    SERVICE_NAME: z.string().default('cdn-api'),
   })
   .superRefine((env, ctx) => {
     if (env.STORAGE_DRIVER !== 'LOCAL') {

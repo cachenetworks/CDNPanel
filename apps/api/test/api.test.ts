@@ -373,8 +373,12 @@ describe('files, delivery and signed URLs', () => {
     // The copy still serves the shared object.
     expect((await app.inject({ url: `/api/v1/files/${cp.json().id}/download`, headers: { authorization: `Bearer ${key}` } })).statusCode).toBe(200);
     expect((await app.inject({ url: `/api/v1/files/${f.id}`, headers: { authorization: `Bearer ${key}` } })).json().error.code).toBe('file_not_found');
-    const audit = await prisma().auditLog.findFirst({ where: { action: 'FILE_DELETE', targetId: f.id } });
-    expect(audit).not.toBeNull();
+    // Deleting moves the file to the recycle bin; a permanent delete removes it for good.
+    expect(await prisma().auditLog.findFirst({ where: { action: 'FILE_TRASH', targetId: f.id } })).not.toBeNull();
+    const purge = await app.inject({ method: 'DELETE', url: `/api/v1/files/${f.id}?permanent=true`, headers: { authorization: `Bearer ${key}` } });
+    expect(purge.statusCode).toBe(204);
+    expect(await prisma().file.findUnique({ where: { id: f.id } })).toBeNull();
+    expect(await prisma().auditLog.findFirst({ where: { action: 'FILE_DELETE', targetId: f.id } })).not.toBeNull();
   });
 
   it('supports chunked uploads with checksum verification', async () => {

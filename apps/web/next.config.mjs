@@ -41,6 +41,11 @@ const nextConfig = {
       { source: '/api/:path*', destination: `${apiOrigin}/api/:path*` },
       { source: '/files/:path*', destination: `${apiOrigin}/files/:path*` },
       { source: '/p/:path*', destination: `${apiOrigin}/p/:path*` },
+      { source: '/img/:path*', destination: `${apiOrigin}/img/:path*` },
+      { source: '/media/:path*', destination: `${apiOrigin}/media/:path*` },
+      { source: '/s/:path*', destination: `${apiOrigin}/s/:path*` },
+      { source: '/_challenge/:path*', destination: `${apiOrigin}/_challenge/:path*` },
+      { source: '/_auth/:path*', destination: `${apiOrigin}/_auth/:path*` },
       { source: '/openapi.json', destination: `${apiOrigin}/openapi.json` },
     ];
   },

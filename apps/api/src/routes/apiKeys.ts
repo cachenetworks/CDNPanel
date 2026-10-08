@@ -108,35 +108,56 @@ export const apiKeyRoutes: RouteDef<any, any, any>[] = [
     permission: 'api_keys.create',
     body: z.object({
       name: z.string().trim().min(1).max(100),
-      environment: z.enum(['live', 'test']).default('live'),
-      scopes: scopesSchema,
+      environment: z.enum(['live', 'test']).optional(),
+      scopes: scopesSchema.optional(),
       expires_at: z.coerce.date().nullable().optional(),
       rate_limit: z.number().int().min(1).max(100000).nullable().optional(),
-      ip_restrictions: ipList.default([]),
-      allowed_endpoints: endpointList.default([]),
+      ip_restrictions: ipList.optional(),
+      allowed_endpoints: endpointList.optional(),
       notes: z.string().max(2000).optional(),
+      project_id: z.string().nullable().optional().describe('Confine the key to the zones of one project.'),
+      service_account_id: z.string().nullable().optional().describe('Owner service account (machine identity).'),
+      template_id: z.string().optional().describe('Apply defaults (scopes, limits, restrictions, lifetime) from an API key template.'),
     }),
     responses: { 201: { description: 'Created key (secret shown once)', example: { api_key: KEY_EXAMPLE, key: 'cdn_live_a82fQ0m3x9Lr2Ty7Vb4Nc8Hs1Kd6Pz5Wq' } } },
     errors: ['validation_failed', 'forbidden'],
     async handler({ req, reply, body, auth }) {
       const s = auth as SessionAuth;
-      const generated = generateApiKey(getKeyring(), body.environment);
+      const prisma = getPrisma();
+      const template = body.template_id ? await prisma.apiKeyTemplate.findUnique({ where: { id: body.template_id } }) : null;
+      if (body.template_id && !template) throw new AppError('not_found', 'The API key template does not exist.');
+      const scopes = body.scopes ?? template?.scopes.filter(isApiScope) ?? [];
+      if (scopes.length === 0) throw new AppError('validation_failed', 'select at least one scope');
+      let projectId = body.project_id ?? null;
+      let serviceAccountId: string | null = null;
+      if (body.service_account_id) {
+        const sa = await prisma.serviceAccount.findUnique({ where: { id: body.service_account_id } });
+        if (!sa) throw new AppError('not_found', 'The service account does not exist.');
+        serviceAccountId = sa.id;
+        projectId = projectId ?? sa.projectId;
+      }
+      if (projectId && !(await prisma.project.findUnique({ where: { id: projectId } }))) throw new AppError('project_not_found');
+      const environment = body.environment ?? (template?.environment === 'TEST' ? 'test' : 'live');
+      const expiresAt = body.expires_at !== undefined ? body.expires_at : template?.expiresInDays ? new Date(Date.now() + template.expiresInDays * 86_400_000) : null;
+      const generated = generateApiKey(getKeyring(), environment);
       const id = newId('apiKey');
-      const key = await getPrisma().apiKey.create({
+      const key = await prisma.apiKey.create({
         data: {
           id,
           name: body.name,
           prefix: generated.prefix,
           keyHash: generated.hash,
           hashVersion: generated.hashVersion,
-          environment: body.environment === 'test' ? 'TEST' : 'LIVE',
+          environment: environment === 'test' ? 'TEST' : 'LIVE',
           createdById: s.user.id,
-          expiresAt: await resolveExpiry(body.expires_at),
-          rateLimit: body.rate_limit ?? null,
-          ipRestrictions: body.ip_restrictions,
-          allowedEndpoints: body.allowed_endpoints,
+          expiresAt: await resolveExpiry(expiresAt),
+          rateLimit: body.rate_limit !== undefined ? body.rate_limit : (template?.rateLimit ?? null),
+          ipRestrictions: body.ip_restrictions ?? template?.ipRestrictions ?? [],
+          allowedEndpoints: body.allowed_endpoints ?? template?.allowedEndpoints ?? [],
           notesEnc: body.notes ? encryptField(getKeyring(), body.notes, `api_key_notes:${id}`) : null,
-          scopes: { create: [...new Set(body.scopes)].map((scope) => ({ scope })) },
+          projectId,
+          serviceAccountId,
+          scopes: { create: [...new Set(scopes)].map((scope) => ({ scope })) },
         },
         include: INCLUDE,
       });
@@ -286,6 +307,8 @@ export const apiKeyRoutes: RouteDef<any, any, any>[] = [
             allowedEndpoints: old.allowedEndpoints,
             notesEnc: null,
             enabled: old.enabled,
+            projectId: old.projectId,
+            serviceAccountId: old.serviceAccountId,
             rotatedFromId: old.id,
             scopes: { create: old.scopes.map((sc) => ({ scope: sc.scope })) },
           },

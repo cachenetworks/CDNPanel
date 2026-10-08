@@ -31,6 +31,7 @@ function serializeWebhook(w: Webhook) {
     url: w.url,
     events: w.events,
     enabled: w.enabled,
+    project_id: w.projectId,
     created_at: w.createdAt.toISOString(),
     updated_at: w.updatedAt.toISOString(),
   };
@@ -70,7 +71,7 @@ export const webhookRoutes: RouteDef<any, any, any>[] = [
       'Registers an endpoint for events. The signing secret is returned **once**; it is stored encrypted (AES-256-GCM) so the platform can sign deliveries. Each delivery carries `X-CDN-Webhook-Id`, `X-CDN-Webhook-Timestamp`, `X-CDN-Event` and `X-CDN-Signature: t=<ts>,v1=<hex HMAC-SHA256(secret, "<ts>.<delivery id>.<body>")>`.',
     auth: 'session',
     permission: 'settings.edit',
-    body: z.object({ name: z.string().trim().min(1).max(100), url: urlSchema, events: eventsSchema, enabled: z.boolean().default(true) }),
+    body: z.object({ name: z.string().trim().min(1).max(100), url: urlSchema, events: eventsSchema, enabled: z.boolean().default(true), project_id: z.string().nullable().optional() }),
     responses: { 201: { description: 'Created webhook', example: { webhook: HOOK_EXAMPLE, secret: 'whsec_…' } } },
     errors: ['validation_failed'],
     async handler({ req, reply, body, auth }) {
@@ -83,6 +84,7 @@ export const webhookRoutes: RouteDef<any, any, any>[] = [
           url: body.url,
           events: body.events,
           enabled: body.enabled,
+          projectId: body.project_id ?? null,
           secretEnc: encryptField(getKeyring(), secret, webhookSecretAad(id)),
           createdById: auth?.type === 'session' ? auth.user.id : null,
         },
@@ -101,13 +103,16 @@ export const webhookRoutes: RouteDef<any, any, any>[] = [
     auth: 'session',
     permission: 'settings.edit',
     params: hookParams,
-    body: z.object({ name: z.string().trim().min(1).max(100).optional(), url: urlSchema.optional(), events: eventsSchema.optional(), enabled: z.boolean().optional() }).strict(),
+    body: z
+      .object({ name: z.string().trim().min(1).max(100).optional(), url: urlSchema.optional(), events: eventsSchema.optional(), enabled: z.boolean().optional(), project_id: z.string().nullable().optional() })
+      .strict(),
     responses: { 200: { description: 'Updated', example: HOOK_EXAMPLE } },
     errors: ['webhook_not_found'],
     async handler({ req, params, body }) {
       const prisma = getPrisma();
       if (!(await prisma.webhook.findUnique({ where: { id: params.id } }))) throw new AppError('webhook_not_found');
-      const hook = await prisma.webhook.update({ where: { id: params.id }, data: body });
+      const { project_id, ...rest } = body;
+      const hook = await prisma.webhook.update({ where: { id: params.id }, data: { ...rest, ...(project_id !== undefined ? { projectId: project_id } : {}) } });
       await audit(actorOf(req), 'WEBHOOK_UPDATED', { type: 'webhook', id: hook.id }, { changes: body });
       return serializeWebhook(hook);
     },

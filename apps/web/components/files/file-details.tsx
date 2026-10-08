@@ -13,6 +13,7 @@ import { Field, Input, NativeSelect, Switch, Label } from '../ui/form';
 import { Badge, CopyButton, KeyValue, Skeleton } from '../ui/misc';
 import { useConfirm } from '../confirm';
 import { FolderPickerDialog } from './folder-picker';
+import { CacheSection, ImageSection, MediaSection, SharesSection, VersionsSection } from './file-extras';
 
 export function statusTone(s: FileDTO['status']) {
   return s === 'READY' ? 'success' : s === 'QUARANTINED' || s === 'FAILED' ? 'danger' : 'warning';
@@ -130,10 +131,10 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                       onClick={() =>
                         confirm({
                           title: `Delete ${f.name}?`,
-                          description: 'The file will be removed permanently and its URLs will stop working.',
-                          confirmLabel: 'Delete file',
+                          description: 'The file moves to the recycle bin and its URLs stop working. It can be restored until the retention period ends.',
+                          confirmLabel: 'Move to recycle bin',
                           destructive: true,
-                          successMessage: 'File deleted',
+                          successMessage: 'File moved to the recycle bin',
                           action: async () => {
                             await api(`/files/${f.id}`, { method: 'DELETE' });
                             void qc.invalidateQueries({ queryKey: ['files'] });
@@ -163,7 +164,8 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                       ['Uploaded', formatDate(f.created_at)],
                       ['Uploaded by', f.uploaded_by ? `${f.uploaded_by.name} (${f.uploaded_by.email})` : f.uploaded_by_api_key ? `API key ${f.uploaded_by_api_key.name} (${f.uploaded_by_api_key.prefix})` : '—'],
                       ['SHA-256', <span key="sha" className="break-all font-mono text-[11px]">{f.sha256 ?? '—'}</span>],
-                      ['Storage', `${f.storage_provider.name ?? f.storage_provider.id}${f.storage_provider.kind ? ` · ${f.storage_provider.kind}` : ''}`],
+                      ['Storage', `${f.storage_provider.name ?? f.storage_provider.id}${f.storage_provider.kind ? ` · ${f.storage_provider.kind}` : ''}${f.storage_class === 'archive' ? ' · archived' : ''}`],
+                      ['Revision', `v${f.version}`],
                       ['Downloads', formatNumber(f.download_count)],
                       ['Bandwidth', formatBytes(f.bandwidth_bytes)],
                       ['Last accessed', formatDate(f.last_accessed_at)],
@@ -261,6 +263,11 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                     )}
                   </section>
                 )}
+                <MediaSection file={f} />
+                <ImageSection file={f} />
+                <VersionsSection file={f} onChanged={refresh} />
+                {can('shares.manage') && <SharesSection file={f} />}
+                <CacheSection file={f} onChanged={refresh} />
                 {Object.keys(f.metadata ?? {}).length > 0 && (
                   <section>
                     <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custom metadata</h3>

@@ -1,0 +1,25 @@
+{
+  "name": "@cachenetworks/cdnpanel-sdk",
+  "version": "2.0.0",
+  "description": "Official TypeScript / JavaScript SDK for the CDNPanel API",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "SEE LICENSE IN ../../LICENSE"
+}

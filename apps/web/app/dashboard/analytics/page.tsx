@@ -7,6 +7,7 @@ import type { ApiKeyDTO, SeriesPoint } from '@/lib/types';
 import { formatBytes, formatDate, formatNumber } from '@/lib/utils';
 import { useSession } from '@/lib/session';
 import { NativeSelect } from '@/components/ui/form';
+import { DeliveryMap, countryName, type GeoData } from '@/components/analytics/delivery-map';
 import { Badge, EmptyState, ErrorState, PageHeader, Panel, Section, Skeleton } from '@/components/ui/misc';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { PeriodPicker, RankedBars, StatusCodeChart, TimeChart, periodQuery, type PeriodValue } from '@/components/charts';
@@ -83,6 +84,7 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
+      <GeoSection period={period.period === '24h' || period.period === '7d' || period.period === '30d' ? period.period : '30d'} />
       <Section title="Over time">
         {!d ? (
           <Skeleton className="h-[460px]" />
@@ -219,5 +221,37 @@ export default function AnalyticsPage() {
         </>
       )}
     </>
+  );
+}
+
+function GeoSection({ period }: { period: '24h' | '7d' | '30d' }) {
+  const geo = useQuery({ queryKey: ['geo', period], queryFn: () => api<GeoData>('/analytics/geo', { query: { period } }), refetchInterval: 60_000 });
+  return (
+    <Section title="Global delivery" description="Visitors by country with live flows from storage origins. Hover a country for details.">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <Panel className="p-3">{geo.data ? <DeliveryMap data={geo.data} /> : <Skeleton className="aspect-[2/1] w-full" />}</Panel>
+        <Panel className="max-h-[520px] overflow-y-auto">
+          <table className="w-full text-[13px]">
+            <thead className="sticky top-0 bg-subtle text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Country</th>
+                <th className="px-3 py-2 text-right font-medium">Requests</th>
+                <th className="px-3 py-2 text-right font-medium">Bandwidth</th>
+              </tr>
+            </thead>
+            <tbody>
+              {geo.data?.countries.map((c) => (
+                <tr key={c.country} className="border-t">
+                  <td className="px-3 py-1.5">{countryName(c.country)}</td>
+                  <td className="px-3 py-1.5 text-right tabular">{formatNumber(c.requests)}</td>
+                  <td className="px-3 py-1.5 text-right tabular">{formatBytes(c.bytes)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {geo.data && geo.data.countries.length === 0 && <p className="p-4 text-center text-xs text-muted-foreground">No delivery traffic in this period.</p>}
+        </Panel>
+      </div>
+    </Section>
   );
 }

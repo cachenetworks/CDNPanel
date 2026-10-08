@@ -12,6 +12,7 @@ import { Field, Input } from '@/components/ui/form';
 import { Badge, CopyButton, KeyValue, PageHeader, Panel, Section, Skeleton } from '@/components/ui/misc';
 import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { useConfirm, useStepUp } from '@/components/confirm';
+import { LinkedIdentities, Passkeys } from '@/components/account/identity';
 
 function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => void }) {
   return (
@@ -180,6 +181,8 @@ function AccountInner() {
           <TwoFactor />
         </Panel>
       </Section>
+      <Passkeys />
+      <LinkedIdentities linked={params.get('sso_linked')} error={params.get('sso_error')} />
       <Section title="Change password" description="Other sessions are signed out after a password change.">
         <Panel className="max-w-2xl p-4">
           <form

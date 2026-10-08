@@ -16,7 +16,7 @@ import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { CreateKeyDialog, RevealKeyDialog } from '@/components/api-keys/create-key';
 import { useConfirm } from '@/components/confirm';
 
-const STATUS_TONE = { active: 'success', disabled: 'neutral', revoked: 'danger', expired: 'warning' } as const;
+const STATUS_TONE = { active: 'success', disabled: 'neutral', revoked: 'danger', expired: 'warning', suspended: 'danger' } as const;
 
 function EditKeyDialog({ apiKey, onClose }: { apiKey: ApiKeyDTO | null; onClose: () => void }) {
   const qc = useQueryClient();
@@ -317,6 +317,16 @@ export default function ApiKeysPage() {
                               <Power /> {k.enabled ? 'Disable' : 'Enable'}
                             </DropdownMenuItem>
                           )}
+                          {can('api_keys.revoke') && k.status === 'suspended' && (
+                            <DropdownMenuItem
+                              onSelect={async () => {
+                                await api(`/api-keys/${k.id}/unsuspend`, { method: 'POST' });
+                                void qc.invalidateQueries({ queryKey: ['api-keys'] });
+                              }}
+                            >
+                              <Power /> Lift suspension
+                            </DropdownMenuItem>
+                          )}
                           {can('api_keys.revoke') && (
                             <>
                               <DropdownMenuSeparator />
@@ -370,6 +380,9 @@ export default function ApiKeysPage() {
                   ['Last used', viewing.last_used_at ? `${formatDate(viewing.last_used_at)} from ${viewing.last_used_ip}` : 'Never'],
                   ['Requests', formatNumber(viewing.request_count)],
                   ['Expires', viewing.expires_at ? formatDate(viewing.expires_at) : 'Never'],
+                  ['Project scope', viewing.project_id ?? 'All files'],
+                  ...(viewing.service_account_id ? [['Service account', viewing.service_account_id] as [string, string]] : []),
+                  ...(viewing.suspended_at ? [['Suspended', `${formatDate(viewing.suspended_at)} — ${viewing.suspended_reason ?? ''}`] as [string, string]] : []),
                   ...(viewing.revoked_at ? [['Revoked', `${formatDate(viewing.revoked_at)}${viewing.revoked_reason ? ` (${viewing.revoked_reason})` : ''}`] as [string, string]] : []),
                 ]}
               />

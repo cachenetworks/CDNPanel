@@ -16,6 +16,9 @@ export default defineWorkspace([
       globalSetup: ['apps/api/test/globalSetup.ts'],
       setupFiles: ['apps/api/test/env.ts'],
       fileParallelism: false,
+      // Suites share one database and Redis: run them strictly one after another.
+      pool: 'forks',
+      poolOptions: { forks: { singleFork: true } },
       testTimeout: 30_000,
       hookTimeout: 60_000,
     },
