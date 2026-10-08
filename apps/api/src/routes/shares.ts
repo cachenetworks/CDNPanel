@@ -100,6 +100,8 @@ export const shareRoutes: RouteDef<any, any, any>[] = [
         return sendHtml(reply, `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Link unavailable</title><body style="font:15px system-ui;display:grid;place-items:center;min-height:100vh;margin:0"><main style="max-width:28rem;padding:16px;text-align:center"><h1>Link unavailable</h1><p>${message.replace(/[<>&]/g, '')}</p></main></body>`, status);
       }
       await recordShareAccess(req, share, { downloaded: false });
+      // A share landing GET counts as a click, independently of file delivery.
+      req.analytics = { fileId: share.fileId, kind: 'share', trafficType: 'click' };
       return sendHtml(reply, renderSharePage({ siteName: settings.general.siteName, share, token: params.token, unlocked: isUnlocked(req, share) }));
     },
   }),
