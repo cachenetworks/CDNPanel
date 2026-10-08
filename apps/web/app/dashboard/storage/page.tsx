@@ -25,7 +25,12 @@ interface Provider {
   enabled: boolean;
   public_info: Record<string, string>;
   capacity: number | null;
+  configured_capacity: number | null;
   available: number | null;
+  disk_total: number | null;
+  disk_free: number | null;
+  disk_used: number | null;
+  disk_other_used_estimate: number | null;
   used: number;
   file_count: number;
   region: string;
@@ -42,6 +47,10 @@ interface StorageStats {
   quota: number | null;
   available: number | null;
   capacity: number | null;
+  disk_total: number | null;
+  disk_free: number | null;
+  disk_used: number | null;
+  disk_other_used_estimate: number | null;
   file_count: number;
   average_file_size: number;
   largest_files: FileDTO[];
@@ -93,7 +102,7 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
       setSecretAccessKey('');
       setPrefix('');
       setPathStyle(false);
-      setCapacityGb(provider?.capacity ? String(Math.round(provider.capacity / 1024 ** 3)) : '');
+      setCapacityGb(provider?.configured_capacity ? String(Math.round(provider.configured_capacity / 1024 ** 3)) : '');
       setReplaceConfig(!provider);
       setRegion2(provider?.region ?? '');
       setServes(provider?.serves_countries ?? []);
@@ -191,7 +200,7 @@ function ProviderDialog({ provider, open, onOpenChange }: { provider: Provider |
                   </div>
                 </div>
               ))}
-            <Field label="Capacity (GB, optional)" hint="Used for capacity dashboards. Upload quotas are configured in Settings → Uploads.">
+            <Field label="Provider quota (GB, optional)" hint="Limits CDN usage on this provider. Host free space is checked separately where supported; cloud capacity can be unknown. Global upload quotas are in Settings → Uploads.">
               <Input type="number" min={1} value={capacityGb} onChange={(e) => setCapacityGb(e.target.value)} className="w-40" />
             </Field>
             <div className="grid gap-4 sm:grid-cols-3">
@@ -261,7 +270,7 @@ export default function StoragePage() {
           <div className="mb-8 grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-5">
             {[
               ['Storage used', formatBytes(d.used)],
-              ['Available', d.available !== null ? formatBytes(d.available) : 'Unlimited'],
+              ['Upload headroom', d.available !== null ? formatBytes(d.available) : 'Unknown'],
               ['Files', formatNumber(d.file_count)],
               ['Average file size', formatBytes(d.average_file_size)],
               ['Default backend', d.default_backend ? `${d.default_backend.name} (${d.default_backend.kind})` : '—'],
@@ -272,10 +281,20 @@ export default function StoragePage() {
               </div>
             ))}
           </div>
+          <Panel className="mb-8 p-4">
+            <h3 className="text-sm font-semibold">Default backend disk usage</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Local disk usage includes all other server applications and files. CDN usage is logical file size; other usage is estimated. Cloud providers may not report physical capacity.</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-4">
+              <div><div className="text-xs text-muted-foreground">Volume total</div><div className="font-semibold">{d.disk_total === null ? 'Unknown' : formatBytes(d.disk_total)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Volume used (all apps)</div><div className="font-semibold">{d.disk_used === null ? 'Unknown' : formatBytes(d.disk_used)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Volume free</div><div className="font-semibold">{d.disk_free === null ? 'Unknown' : formatBytes(d.disk_free)}</div></div>
+              <div><div className="text-xs text-muted-foreground">Non-CDN usage (estimate)</div><div className="font-semibold">{d.disk_other_used_estimate === null ? 'Unknown' : formatBytes(d.disk_other_used_estimate)}</div></div>
+            </div>
+          </Panel>
           {usedPct !== null && (
             <div className="mb-8">
               <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                <span>{d.quota ? 'Quota' : 'Capacity'} usage</span>
+                <span>Estimated current usable capacity</span>
                 <span className="tabular">
                   {formatBytes(d.used)} of {formatBytes(d.capacity)} ({usedPct.toFixed(1)}%)
                 </span>
@@ -296,6 +315,7 @@ export default function StoragePage() {
                     <TH>Location</TH>
                     <TH className="text-right">Files</TH>
                     <TH className="text-right">Used</TH>
+                    <TH className="text-right">Upload headroom</TH>
                     <TH>Status</TH>
                     <TH className="w-10" />
                   </tr>
@@ -313,6 +333,7 @@ export default function StoragePage() {
                       <TD className="max-w-[260px] truncate font-mono text-xs text-muted-foreground">{p.public_info.root ?? [p.public_info.bucket, p.public_info.endpoint].filter(Boolean).join(' @ ')}</TD>
                       <TD className="text-right tabular">{formatNumber(p.file_count)}</TD>
                       <TD className="text-right tabular">{formatBytes(p.used)}</TD>
+                      <TD className="text-right tabular" title={p.kind === 'LOCAL' ? 'Includes available volume space and configured quota' : 'Cloud storage quota only; physical free space is unknown'}>{p.available === null ? 'Unknown' : formatBytes(p.available)}</TD>
                       <TD>{p.enabled ? <Badge tone="success">Enabled</Badge> : <Badge>Disabled</Badge>}</TD>
                       <TD>
                         {manage && (
