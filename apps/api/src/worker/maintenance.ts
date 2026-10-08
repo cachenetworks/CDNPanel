@@ -54,10 +54,12 @@ export async function aggregateDay(day: Date): Promise<void> {
   for (const d of dims) {
     // Expressions above are static strings (never user input), so building SQL here is safe.
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "AnalyticsDaily" ("id", "date", "dimension", "dimensionId", "requests", "downloads", "bytes", "errors", "uploads", "avgMs", "updatedAt")
+      `INSERT INTO "AnalyticsDaily" ("id", "date", "dimension", "dimensionId", "requests", "downloads", "views", "clicks", "bytes", "errors", "uploads", "avgMs", "updatedAt")
        SELECT 'agg_' || md5($3 || ':' || ${d.expr} || ':' || $1::text), ($1::timestamptz AT TIME ZONE 'UTC')::date, $3, ${d.expr},
               count(*),
-              count(*) FILTER (WHERE "kind" IN ('delivery', 'share') AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start')),
+              count(*) FILTER (WHERE "trafficType" = 'download' AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start')),
+              count(*) FILTER (WHERE "trafficType" = 'view' AND "method" = 'GET' AND ("statusCode" = 200 OR "cacheStatus" = 'range-start')),
+              count(*) FILTER (WHERE "trafficType" = 'click' AND "method" = 'GET' AND "statusCode" = 200),
               coalesce(sum("bytesSent"), 0),
               count(*) FILTER (WHERE "statusCode" >= 400),
               0,
@@ -65,9 +67,9 @@ export async function aggregateDay(day: Date): Promise<void> {
               (now() AT TIME ZONE 'UTC')
        FROM "FileRequest"
        WHERE "timestamp" >= ($1::timestamptz AT TIME ZONE 'UTC') AND "timestamp" < ($2::timestamptz AT TIME ZONE 'UTC') ${d.filter ? `AND ${d.filter}` : ''}
-       GROUP BY ${d.expr}
+       ${d.name === 'total' ? '' : `GROUP BY ${d.expr}`}
        ON CONFLICT ("date", "dimension", "dimensionId") DO UPDATE SET
-         "requests" = EXCLUDED."requests", "downloads" = EXCLUDED."downloads", "bytes" = EXCLUDED."bytes",
+         "requests" = EXCLUDED."requests", "downloads" = EXCLUDED."downloads", "views" = EXCLUDED."views", "clicks" = EXCLUDED."clicks", "bytes" = EXCLUDED."bytes",
          "errors" = EXCLUDED."errors", "avgMs" = EXCLUDED."avgMs", "updatedAt" = (now() AT TIME ZONE 'UTC')`,
       start,
       end,
