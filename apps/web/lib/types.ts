@@ -115,6 +115,8 @@ export interface SeriesPoint {
   t: string;
   requests: number;
   downloads: number;
+  views: number;
+  clicks: number;
   bandwidth: number;
   errors: number;
   cache_hits: number;
