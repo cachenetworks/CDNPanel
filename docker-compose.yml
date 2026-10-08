@@ -70,7 +70,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: unless-stopped
     command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?set REDIS_PASSWORD}', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
     volumes:
