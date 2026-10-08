@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # API + worker image (same image, different command).
 FROM node:22-bookworm-slim AS base
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 FROM base AS build
@@ -19,8 +19,8 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 RUN npx prisma generate --schema packages/database/prisma/schema.prisma \
  && npm run build -w @cdn/shared -w @cdn/storage -w @cdn/database -w @cdn/api \
- && npm prune --omit=dev --workspace @cdn/api --workspace @cdn/database --workspace @cdn/shared --workspace @cdn/storage \
- && npm install --no-save --no-audit --no-fund prisma@5.22.0
+ && npm prune --omit=dev \
+ && npm install --no-save --omit=dev --no-audit --no-fund prisma@5.22.0
 
 FROM base AS runtime
 ENV NODE_ENV=production
