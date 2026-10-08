@@ -2,35 +2,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  Activity,
-  BarChart3,
-  Bot,
-  BookOpen,
-  CalendarClock,
-  Coins,
-  Globe,
-  Recycle,
-  ScanSearch,
-  ServerCog,
-  Share2,
-  Zap,
-  FolderTree,
-  Files,
-  HardDrive,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Moon,
-  Settings,
-  Shield,
-  ShieldCheck,
-  Sun,
-  UploadCloud,
-  UserCog,
-  Users,
-} from 'lucide-react';
+import { Activity, BarChart3, Bot, BookOpen, CalendarClock, Coins, Globe, Recycle, ScanSearch, ServerCog, Share2, Zap, FolderTree, Files, HardDrive, KeyRound, LayoutDashboard, LogOut, Menu, Moon, Settings, Shield, ShieldCheck, Sun, UploadCloud, UserCog, Users, Network } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Permission } from '@cdn/shared/permissions';
 import { cn } from '@/lib/utils';
@@ -88,6 +60,7 @@ const NAV: { group?: string; items: NavItem[] }[] = [
       { href: '/dashboard/users', label: 'Users', icon: Users, perm: 'users.view' },
       { href: '/dashboard/roles', label: 'Roles', icon: ShieldCheck, perm: 'roles.view' },
       { href: '/dashboard/storage', label: 'Storage', icon: HardDrive, perm: 'files.view' },
+      { href: '/dashboard/nodes', label: 'Nodes & RAID', icon: Network, perm: 'storage.manage' },
       { href: '/dashboard/security', label: 'Security', icon: Shield, perm: 'logs.view' },
       { href: '/dashboard/lifecycle', label: 'Lifecycle Rules', icon: CalendarClock, perm: 'zones.view' },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings, perm: 'settings.view' },

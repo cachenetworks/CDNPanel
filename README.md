@@ -55,6 +55,7 @@ CDNPanel is intended to be understandable enough to self-host while still having
 | **Image optimisation** | `/img/…?w=800&format=auto` — resize, crop, WebP / AVIF, watermarks, EXIF stripping; signed URLs; permanently cached variants |
 | **Video & audio** | FFmpeg thumbnails, previews, MP4 / WebM, HLS / DASH ladders, audio extraction, waveforms |
 | **Replication** | File replicas across providers, health-checked failover, `PRIMARY_ONLY` / `MIRROR` / `NEAREST` / `FAILOVER`, automatic repair |
+| **Storage nodes & RAID** | Add more servers as storage nodes and pool them with RAID 0 / 1 / 5 / 6 / 10 — degraded reads, automatic catch-up and slot rebuilds. See [docs/nodes.md](docs/nodes.md) |
 | **Share links** | Passwords, expiry, download limits, one-time links, IP / country limits, email capture, access log |
 | **Revisions & lifecycle** | Revisions with rollback, recycle bin, expiry, lifecycle rules (trash / delete / archive / tier) |
 | **Edge security** | WAF-style rules, browser challenges, IP bans, hotlink / geo / ASN blocking, API-key abuse suspension, signed cookies, passkeys, OIDC / Google / GitHub / Discord SSO |

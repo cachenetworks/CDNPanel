@@ -103,6 +103,28 @@ export class LocalStorageDriver implements StorageDriver {
     await fs.rm(probe, { force: true });
   }
 
+  async *listKeys(prefix = ''): AsyncIterable<string> {
+    const root = await this.ensureRoot();
+    // Start from the deepest directory the prefix names, then filter by the full prefix.
+    const slash = prefix.lastIndexOf('/');
+    const startRel = slash >= 0 ? prefix.slice(0, slash) : '';
+    const stack = [startRel];
+    while (stack.length) {
+      const rel = stack.pop()!;
+      let entries;
+      try {
+        entries = await fs.readdir(rel ? safeResolve(root, rel) : root, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const key = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) stack.push(key);
+        else if (entry.isFile() && key.startsWith(prefix) && !entry.name.endsWith('.tmp') && !entry.name.startsWith('.healthcheck-')) yield key;
+      }
+    }
+  }
+
   async capacity(): Promise<CapacityInfo> {
     try {
       const root = await this.ensureRoot();

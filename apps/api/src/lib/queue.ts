@@ -9,6 +9,7 @@ export const QUEUE_NAMES = {
   media: 'media',
   replication: 'replication',
   edge: 'edge',
+  pools: 'pools',
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export const ALL_QUEUES = Object.values(QUEUE_NAMES) as QueueName[];
@@ -30,6 +31,14 @@ export interface ReplicationJob {
   fileId: string;
   providerId: string;
 }
+/** Rebuild / scrub of a RAID pool (`verify` also checks every shard's presence and length). */
+export interface PoolJob {
+  poolId: string;
+  verify?: boolean;
+  /** Slots to rewrite even if manifests think they are fine (e.g. a replaced node). */
+  positions?: number[];
+  reason?: string;
+}
 export type EdgeJob = { type: 'purge'; purgeId: string } | { type: 'prewarm'; urls: string[] };
 
 export type MaintenanceJobName =
@@ -44,7 +53,9 @@ export type MaintenanceJobName =
   | 'quota-alerts'
   | 'trash-purge'
   | 'prewarm-popular'
-  | 'variant-gc';
+  | 'variant-gc'
+  | 'node-health'
+  | 'pool-scrub';
 
 let connection: Redis | undefined;
 const queues = new Map<string, Queue>();
@@ -98,6 +109,11 @@ export async function enqueueReplication(fileId: string, providerId: string): Pr
     attempts: 5,
     backoff: { type: 'exponential', delay: 15_000 },
   });
+}
+
+export async function enqueuePoolRepair(job: PoolJob): Promise<void> {
+  // One queued run per pool at a time; a running job is not affected.
+  await getQueue(QUEUE_NAMES.pools).add('repair', job, { jobId: `pool-${job.poolId}-${job.verify ? 'verify' : 'repair'}`, removeOnComplete: true, removeOnFail: 50 });
 }
 
 export async function enqueueEdge(job: EdgeJob): Promise<void> {

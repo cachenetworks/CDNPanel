@@ -41,6 +41,9 @@ export const ID_PREFIXES = {
   quota: 'quo',
   serviceAccount: 'sva',
   apiKeyTemplate: 'akt',
+  storageNode: 'snd',
+  storagePool: 'spl',
+  poolMember: 'spm',
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

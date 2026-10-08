@@ -1,0 +1,27 @@
+# CDNPanel storage node: run this on every extra server that lends its disk to the CDN.
+# Then add it in the panel under Administration → Nodes & RAID with this server's URL and NODE_TOKEN.
+name: cdn-node
+
+services:
+  node:
+    image: ${API_IMAGE:-ghcr.io/cachenetworks/cdnpanel-api:latest}
+    command: ['node', 'dist/node-agent.js']
+    restart: unless-stopped
+    environment:
+      NODE_TOKEN: ${NODE_TOKEN:?set NODE_TOKEN (openssl rand -base64 48)}
+      NODE_NAME: ${NODE_NAME:-}
+      NODE_DATA_PATH: /data/node
+      PORT: 8874
+    ports:
+      # Bind to a private address (Tailscale / WireGuard / LAN) when you can, e.g. "100.71.249.127:8874:8874".
+      - '${NODE_BIND:-0.0.0.0}:${NODE_PORT:-8874}:8874'
+    volumes:
+      - ${NODE_DATA_DIR:-./data}:/data/node
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8874/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]

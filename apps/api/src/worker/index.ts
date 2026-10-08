@@ -11,6 +11,7 @@ import {
   type FileProcessingJob,
   type MaintenanceJobName,
   type MediaJob,
+  type PoolJob,
   type ReplicationJob,
   type WebhookJob,
 } from '../lib/queue.js';
@@ -25,6 +26,7 @@ import { processMedia } from '../services/media.js';
 import { executePurge, prewarmUrls } from '../services/purge.js';
 import { checkProviderHealth, repairReplicas, replicateFile } from '../services/replication.js';
 import { evaluateQuotaAlerts } from '../services/usage.js';
+import { checkNodes, runPoolRepair, scrubPools } from '../services/storageNodes.js';
 import { getSettings } from '../lib/settings.js';
 import { getPrisma } from '@cdn/database';
 
@@ -83,6 +85,15 @@ async function main() {
   );
   replicationWorker.on('failed', (job, err) => log.warn({ err: err.message, file_id: job?.data.fileId, provider_id: job?.data.providerId }, 'replication failed'));
 
+  // RAID pool rebuilds can take hours: own queue, one at a time, so other jobs never wait behind them.
+  const poolWorker = new Worker<PoolJob>(QUEUE_NAMES.pools, async (job) => runPoolRepair(job.data.poolId, job.data), {
+    connection: bullConnection(),
+    concurrency: 1,
+    lockDuration: 600_000,
+    metrics,
+  });
+  poolWorker.on('failed', (job, err) => log.error({ err, pool_id: job?.data.poolId }, 'pool repair failed'));
+
   const edgeWorker = new Worker<EdgeJob>(
     QUEUE_NAMES.edge,
     async (job) => {
@@ -122,6 +133,10 @@ async function main() {
           return prewarmPopular();
         case 'variant-gc':
           return garbageCollectVariants();
+        case 'node-health':
+          return checkNodes();
+        case 'pool-scrub':
+          return scrubPools();
       }
     },
     { connection: bullConnection(), concurrency: 1, lockDuration: 900_000, metrics },
@@ -143,6 +158,8 @@ async function main() {
     ['trash-purge', '15 * * * *'],
     ['prewarm-popular', '5 */6 * * *'],
     ['variant-gc', '0 5 * * 0'],
+    ['node-health', '* * * * *'],
+    ['pool-scrub', '40 4 * * *'],
   ];
   for (const [name, pattern] of schedules) await q.add(name, {}, { repeat: { pattern }, jobId: name });
 
@@ -155,7 +172,7 @@ async function main() {
   const shutdown = async () => {
     log.info('worker shutting down');
     clearInterval(heartbeat);
-    await Promise.allSettled([fileWorker.close(), webhookWorker.close(), mediaWorker.close(), replicationWorker.close(), edgeWorker.close(), maintenanceWorker.close()]);
+    await Promise.allSettled([fileWorker.close(), webhookWorker.close(), mediaWorker.close(), replicationWorker.close(), poolWorker.close(), edgeWorker.close(), maintenanceWorker.close()]);
     await closeQueues();
     await closeRedis();
     await disconnectPrisma();

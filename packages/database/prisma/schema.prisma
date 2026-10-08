@@ -217,6 +217,8 @@ enum StorageKind {
   R2
   MINIO
   B2
+  /// A RAID pool of storage nodes (managed under Storage → Nodes & RAID).
+  POOL
 }
 
 model StorageProvider {
@@ -252,6 +254,80 @@ model StorageProvider {
   zones                  Zone[]
   replicas               FileReplica[]
   versions               FileVersion[]
+  pool                   StoragePool?
+}
+
+enum StorageNodeKind {
+  /// Another server running the storage node agent, reached over HTTP(S).
+  REMOTE
+  /// A directory on the main CDN server (lets this server's disk join a pool).
+  LOCAL
+}
+
+/// A server (or local directory) that lends its disk to the CDN.
+model StorageNode {
+  id          String              @id
+  name        String              @unique
+  kind        StorageNodeKind
+  /// Agent base URL (REMOTE).
+  url         String              @default("")
+  /// AES-256-GCM encrypted agent token (REMOTE). AAD = node id.
+  tokenEnc    String?
+  /// Directory on this server (LOCAL).
+  path        String              @default("")
+  region      String              @default("")
+  enabled     Boolean             @default(true)
+  /// online | offline | unknown — updated by the node health check.
+  status      String              @default("unknown")
+  totalBytes  BigInt?
+  freeBytes   BigInt?
+  latencyMs   Int?
+  version     String?
+  lastSeenAt  DateTime?
+  lastError   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  memberships StoragePoolMember[]
+}
+
+enum RaidLevel {
+  RAID0
+  RAID1
+  RAID5
+  RAID6
+  RAID10
+}
+
+/// Nodes combined into one storage provider with RAID striping / mirroring / parity.
+model StoragePool {
+  id           String              @id
+  name         String              @unique
+  level        RaidLevel
+  /// Maximum stripe chunk in bytes.
+  chunkSize    Int                 @default(1048576)
+  providerId   String              @unique
+  provider     StorageProvider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  /// healthy | degraded | failed | unknown
+  status       String              @default("unknown")
+  /// Progress of the current or last rebuild / scrub.
+  rebuildState Json?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  members      StoragePoolMember[]
+}
+
+model StoragePoolMember {
+  id       String      @id
+  poolId   String
+  pool     StoragePool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  nodeId   String
+  node     StorageNode @relation(fields: [nodeId], references: [id], onDelete: Restrict)
+  /// Slot in the RAID layout (0-based); a replacement node takes over the same slot.
+  position Int
+  addedAt  DateTime    @default(now())
+
+  @@unique([poolId, position])
+  @@index([nodeId])
 }
 
 enum Visibility {

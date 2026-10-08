@@ -1,6 +1,6 @@
 import type { Readable } from 'node:stream';
 
-export type StorageKind = 'LOCAL' | 'S3' | 'R2' | 'MINIO' | 'B2';
+export type StorageKind = 'LOCAL' | 'S3' | 'R2' | 'MINIO' | 'B2' | 'NODE' | 'POOL';
 
 export interface ByteRange {
   /** inclusive */
@@ -48,6 +48,8 @@ export interface StorageDriver {
   presignGet?(key: string, opts: PresignOptions): Promise<string>;
   /** Absolute path on disk (local driver only) — used for Nginx X-Accel-Redirect. */
   resolvePath?(key: string): string;
+  /** Every object key under `prefix`, in no particular order (local, node and pool drivers). */
+  listKeys?(prefix?: string): AsyncIterable<string>;
 }
 
 export class StorageError extends Error {

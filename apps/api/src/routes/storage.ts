@@ -221,6 +221,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
       const p = await prisma.storageProvider.findUnique({ where: { id: params.id } });
       if (!p) throw new AppError('storage_provider_not_found');
       if (body.config) {
+        if (p.kind === 'POOL') throw new AppError('validation_failed', 'RAID pool members are managed under Storage → Nodes & RAID.');
         if (body.config.kind !== p.kind) throw new AppError('validation_failed', 'The provider kind cannot be changed.');
         await testConfig(body.config);
       }
@@ -287,6 +288,7 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
       const p = await prisma.storageProvider.findUnique({ where: { id: params.id } });
       if (!p) throw new AppError('storage_provider_not_found');
       if (p.isDefault) throw new AppError('conflict', 'The default provider cannot be removed.');
+      if (p.kind === 'POOL') throw new AppError('conflict', 'This provider is a RAID pool. Remove it under Storage → Nodes & RAID.');
       const [files, uploads] = await Promise.all([prisma.file.count({ where: { storageProviderId: p.id } }), prisma.upload.count({ where: { storageProviderId: p.id } })]);
       if (files > 0) throw new AppError('conflict', `The provider still holds ${files} file(s).`);
       if (uploads > 0) await prisma.upload.deleteMany({ where: { storageProviderId: p.id } });

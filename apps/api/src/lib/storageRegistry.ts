@@ -1,5 +1,5 @@
 import { getPrisma, type StorageProvider } from '@cdn/database';
-import { createStorageDriver, type StorageConfig, type StorageDriver, type StorageKind } from '@cdn/storage';
+import { createStorageDriver, type PoolConfig, type StorageConfig, type StorageDriver, type StorageKind } from '@cdn/storage';
 import { decryptJson, encryptJson, newId } from '@cdn/shared';
 import { z } from 'zod';
 import path from 'node:path';
@@ -28,7 +28,8 @@ export const ProviderConfigSchema = z.discriminatedUnion('kind', [
 ]);
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
 
-type StoredConfig = ProviderConfig | { fromEnv: true };
+/** POOL providers are managed by the nodes service, which rewrites this config when members change. */
+type StoredConfig = ProviderConfig | { fromEnv: true } | { kind: 'POOL'; pool: PoolConfig };
 
 const drivers = new Map<string, { updatedAt: number; driver: StorageDriver }>();
 
@@ -75,9 +76,10 @@ export function toStorageConfig(config: ProviderConfig): StorageConfig {
 
 export function publicInfoFor(config: ProviderConfig | StorageConfig): Record<string, string> {
   if ('config' in config) {
-    return config.kind === 'LOCAL'
-      ? { root: config.config.root }
-      : { bucket: config.config.bucket, endpoint: config.config.endpoint ?? '', region: config.config.region };
+    if (config.kind === 'LOCAL') return { root: config.config.root };
+    if (config.kind === 'NODE') return { url: config.config.url };
+    if (config.kind === 'POOL') return { level: config.config.level, nodes: String(config.config.members.length) };
+    return { bucket: config.config.bucket, endpoint: config.config.endpoint ?? '', region: config.config.region };
   }
   return config.kind === 'LOCAL' ? { root: config.root } : { bucket: config.bucket, endpoint: config.endpoint ?? '', region: config.region };
 }
@@ -85,6 +87,7 @@ export function publicInfoFor(config: ProviderConfig | StorageConfig): Record<st
 function buildDriver(provider: StorageProvider): StorageDriver {
   const stored = decryptJson<StoredConfig>(getKeyring(), provider.configEnc, aad(provider.id));
   if ('fromEnv' in stored) return createStorageDriver(envStorageConfig());
+  if (stored.kind === 'POOL') return createStorageDriver({ kind: 'POOL', config: stored.pool });
   return createStorageDriver(toStorageConfig(stored));
 }
 
@@ -113,7 +116,7 @@ export async function ensureDefaultProvider(): Promise<StorageProvider> {
     data: {
       id,
       name: 'Primary (environment)',
-      kind: cfg.kind as StorageKind,
+      kind: cfg.kind as Exclude<StorageKind, 'NODE'>,
       configEnc: encryptProviderConfig(id, { fromEnv: true }),
       publicInfo: { ...publicInfoFor(cfg), source: 'environment' },
       isDefault: true,

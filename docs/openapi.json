@@ -16735,6 +16735,2207 @@
         ]
       }
     },
+    "/api/v1/storage/nodes": {
+      "get": {
+        "operationId": "get_api_v1_storage_nodes",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "List storage nodes",
+        "description": "Servers (and local directories) that lend their disk to the CDN, with live status and disk space.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Storage nodes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/storage/nodes\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/storage/nodes\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_storage_nodes",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Add a storage node",
+        "description": "Registers a server running the storage node agent (`REMOTE`: its URL and NODE_TOKEN) or a directory on this server (`LOCAL`). The node is contacted and must pass a write test. Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "REMOTE",
+                      "LOCAL"
+                    ],
+                    "default": "REMOTE"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 500
+                  },
+                  "token": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 512
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "region": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "default": ""
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "name": "string",
+                "kind": "REMOTE",
+                "url": "https://hooks.example.com/cdn",
+                "token": "string",
+                "path": "string",
+                "region": ""
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/nodes\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\":\"string\",\"kind\":\"REMOTE\",\"url\":\"https://hooks.example.com/cdn\",\"token\":\"string\",\"path\":\"string\",\"region\":\"\"}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"kind\": \"REMOTE\",\n    \"url\": \"https://hooks.example.com/cdn\",\n    \"token\": \"string\",\n    \"path\": \"string\",\n    \"region\": \"\"\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"kind\": \"REMOTE\",\n    \"url\": \"https://hooks.example.com/cdn\",\n    \"token\": \"string\",\n    \"path\": \"string\",\n    \"region\": \"\"\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/nodes\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"name\": \"string\",\n        \"kind\": \"REMOTE\",\n        \"url\": \"https://hooks.example.com/cdn\",\n        \"token\": \"string\",\n        \"path\": \"string\",\n        \"region\": \"\"\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/nodes/{id}": {
+      "patch": {
+        "operationId": "patch_api_v1_storage_nodes_id",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Update a storage node",
+        "description": "Rename, move (new URL), rotate its token, or enable/disable it. Pools using the node pick up the change immediately. Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 500
+                  },
+                  "token": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 512
+                  },
+                  "region": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "example": {
+                "name": "string",
+                "url": "https://hooks.example.com/cdn",
+                "token": "string",
+                "region": "string",
+                "enabled": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated node",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X PATCH \"https://cdn.example.com/api/v1/storage/nodes/ID\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\":\"string\",\"url\":\"https://hooks.example.com/cdn\",\"token\":\"string\",\"region\":\"string\",\"enabled\":false}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID', {\n  method: 'PATCH',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"url\": \"https://hooks.example.com/cdn\",\n    \"token\": \"string\",\n    \"region\": \"string\",\n    \"enabled\": false\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID', {\n  method: 'PATCH',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"url\": \"https://hooks.example.com/cdn\",\n    \"token\": \"string\",\n    \"region\": \"string\",\n    \"enabled\": false\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.patch(\n    \"https://cdn.example.com/api/v1/storage/nodes/ID\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"name\": \"string\",\n        \"url\": \"https://hooks.example.com/cdn\",\n        \"token\": \"string\",\n        \"region\": \"string\",\n        \"enabled\": False\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "delete_api_v1_storage_nodes_id",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Remove a storage node",
+        "description": "Forgets a node. Nodes that are part of a pool must be replaced in the pool first. Data on the node is not touched. Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X DELETE \"https://cdn.example.com/api/v1/storage/nodes/ID\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID', {\n  method: 'DELETE',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = res.status === 204 ? null : await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID', {\n  method: 'DELETE',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\n"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.delete(\n    \"https://cdn.example.com/api/v1/storage/nodes/ID\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/nodes/{id}/test": {
+      "post": {
+        "operationId": "post_api_v1_storage_nodes_id_test",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Test a storage node",
+        "description": "Contacts the node now: reachability, a write test and disk space.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node after the test",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/nodes/ID/test\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID/test', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/nodes/ID/test', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/nodes/ID/test\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/pools": {
+      "get": {
+        "operationId": "get_api_v1_storage_pools",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "List RAID pools",
+        "description": "Pools combine storage nodes into one storage provider using RAID 0, 1, 5, 6 or 10.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Pools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/storage/pools\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/storage/pools\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_storage_pools",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Create a RAID pool",
+        "description": "Combines online, unassigned nodes into a pool. The pool becomes a storage provider: make it the default, or point zones at it, to store files on it. Node order sets the RAID slots (for RAID10, consecutive nodes form mirrored pairs). Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "RAID0",
+                      "RAID1",
+                      "RAID5",
+                      "RAID6",
+                      "RAID10"
+                    ]
+                  },
+                  "node_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "maxItems": 32
+                  },
+                  "chunk_size_kb": {
+                    "type": "integer",
+                    "minimum": 64,
+                    "maximum": 16384,
+                    "default": 1024
+                  }
+                },
+                "required": [
+                  "name",
+                  "level",
+                  "node_ids"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "name": "string",
+                "level": "RAID0",
+                "node_ids": [
+                  "string"
+                ],
+                "chunk_size_kb": 1024
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created pool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/pools\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\":\"string\",\"level\":\"RAID0\",\"node_ids\":[\"string\"],\"chunk_size_kb\":1024}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"level\": \"RAID0\",\n    \"node_ids\": [\n      \"string\"\n    ],\n    \"chunk_size_kb\": 1024\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\",\n    \"level\": \"RAID0\",\n    \"node_ids\": [\n      \"string\"\n    ],\n    \"chunk_size_kb\": 1024\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/pools\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"name\": \"string\",\n        \"level\": \"RAID0\",\n        \"node_ids\": [\n            \"string\"\n        ],\n        \"chunk_size_kb\": 1024\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/pools/{id}": {
+      "get": {
+        "operationId": "get_api_v1_storage_pools_id",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Get a RAID pool",
+        "description": "Pool health, capacity, members and rebuild progress.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/storage/pools/ID\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/storage/pools/ID\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "patch_api_v1_storage_pools_id",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Rename a RAID pool",
+        "description": "Renames the pool and its storage provider.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "name": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X PATCH \"https://cdn.example.com/api/v1/storage/pools/ID\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\":\"string\"}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'PATCH',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\"\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'PATCH',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"name\": \"string\"\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.patch(\n    \"https://cdn.example.com/api/v1/storage/pools/ID\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"name\": \"string\"\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "delete_api_v1_storage_pools_id",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Delete a RAID pool",
+        "description": "Removes an empty pool and its storage provider, releasing its nodes. Pools that still hold files, or are the default provider, cannot be deleted. Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X DELETE \"https://cdn.example.com/api/v1/storage/pools/ID\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'DELETE',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = res.status === 204 ? null : await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID', {\n  method: 'DELETE',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\n"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.delete(\n    \"https://cdn.example.com/api/v1/storage/pools/ID\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/pools/{id}/members/{position}/replace": {
+      "post": {
+        "operationId": "post_api_v1_storage_pools_id_members_position_replace",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Replace a node in a RAID pool",
+        "description": "Swaps the node in a slot for another online, unassigned node (e.g. a failed server), then rebuilds that slot from the remaining nodes in the background. The old node is released from the pool. Requires re-authentication.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "position",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "node_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "node_id"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "node_id": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pool (rebuild queued)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-requires-reauthentication": true,
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/pools/ID/members/{position}/replace\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"node_id\":\"string\"}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID/members/{position}/replace', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"node_id\": \"string\"\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID/members/{position}/replace', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"node_id\": \"string\"\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/pools/ID/members/{position}/replace\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"node_id\": \"string\"\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/pools/{id}/repair": {
+      "post": {
+        "operationId": "post_api_v1_storage_pools_id_repair",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Rebuild or scrub a RAID pool",
+        "description": "Queues a background pass that restores full redundancy. With `verify`, every shard on every node is also checked (slower; a full scrub).",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "verify": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "example": {
+                "verify": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "value": {
+                      "error": {
+                        "code": "not_found",
+                        "message": "The requested resource could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/pools/ID/repair\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"verify\":false}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID/repair', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"verify\": false\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/pools/ID/repair', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"verify\": false\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/pools/ID/repair\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"verify\": False\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
     "/api/v1/webhooks": {
       "get": {
         "operationId": "get_api_v1_webhooks",
@@ -36170,7 +38371,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           },
@@ -36343,7 +38545,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           },
@@ -36506,7 +38709,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           },
@@ -36701,7 +38905,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           },
@@ -36896,7 +39101,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           }
@@ -37040,7 +39246,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           }
@@ -37217,7 +39424,8 @@
                 "maintenance",
                 "media",
                 "replication",
-                "edge"
+                "edge",
+                "pools"
               ]
             }
           },

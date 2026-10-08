@@ -27,7 +27,7 @@ ENV NODE_ENV=production
 # FFmpeg / ffprobe for the media pipeline (thumbnails, HLS / DASH, waveforms).
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app /app
-RUN mkdir -p /data/storage /data/tmp && chown -R node:node /data
+RUN mkdir -p /data/storage /data/tmp /data/node && chown -R node:node /data
 USER node
 WORKDIR /app/apps/api
 EXPOSE 4000

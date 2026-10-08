@@ -20,7 +20,7 @@ import { ListInput, StatusDot, healthTone } from '@/components/ui/stat';
 interface Provider {
   id: string;
   name: string;
-  kind: 'LOCAL' | 'S3' | 'R2' | 'MINIO' | 'B2';
+  kind: 'LOCAL' | 'S3' | 'R2' | 'MINIO' | 'B2' | 'POOL';
   is_default: boolean;
   enabled: boolean;
   public_info: Record<string, string>;
@@ -60,6 +60,7 @@ interface StorageStats {
 }
 
 const KIND_HINTS: Record<Provider['kind'], string> = {
+  POOL: 'A RAID pool of storage nodes, managed under Nodes & RAID.',
   LOCAL: 'A directory on the server (inside the allowed base directory).',
   S3: 'Amazon S3. Leave the endpoint empty for AWS.',
   R2: 'Cloudflare R2: endpoint https://<account>.r2.cloudflarestorage.com, region "auto".',
@@ -330,7 +331,7 @@ export default function StoragePage() {
                         </span>
                       </TD>
                       <TD>{p.kind}</TD>
-                      <TD className="max-w-[260px] truncate font-mono text-xs text-muted-foreground">{p.public_info.root ?? [p.public_info.bucket, p.public_info.endpoint].filter(Boolean).join(' @ ')}</TD>
+                      <TD className="max-w-[260px] truncate font-mono text-xs text-muted-foreground">{p.kind === 'POOL' ? <Link href="/dashboard/nodes" className="hover:underline">{p.public_info.level} · {p.public_info.nodes} nodes</Link> : p.public_info.root ?? [p.public_info.bucket, p.public_info.endpoint].filter(Boolean).join(' @ ')}</TD>
                       <TD className="text-right tabular">{formatNumber(p.file_count)}</TD>
                       <TD className="text-right tabular">{formatBytes(p.used)}</TD>
                       <TD className="text-right tabular" title={p.kind === 'LOCAL' ? 'Includes available volume space and configured quota' : 'Cloud storage quota only; physical free space is unknown'}>{p.available === null ? 'Unknown' : formatBytes(p.available)}</TD>
@@ -353,7 +354,7 @@ export default function StoragePage() {
                               >
                                 Test connection
                               </DropdownMenuItem>
-                              {p.public_info.source !== 'environment' && <DropdownMenuItem onSelect={() => setDialog({ open: true, provider: p })}>Edit</DropdownMenuItem>}
+                              {p.public_info.source !== 'environment' && p.kind !== 'POOL' && <DropdownMenuItem onSelect={() => setDialog({ open: true, provider: p })}>Edit</DropdownMenuItem>}
                               {!p.is_default && (
                                 <DropdownMenuItem
                                   onSelect={() =>
@@ -378,7 +379,7 @@ export default function StoragePage() {
                                   {p.enabled ? 'Disable' : 'Enable'}
                                 </DropdownMenuItem>
                               )}
-                              {!p.is_default && p.file_count === 0 && (
+                              {!p.is_default && p.file_count === 0 && p.kind !== 'POOL' && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
