@@ -5,6 +5,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -19,6 +20,7 @@ import {
   type PresignOptions,
   type PutOptions,
   type StorageDriver,
+  type UsageInfo,
   type StorageKind,
 } from './types.js';
 
@@ -135,6 +137,27 @@ export class S3StorageDriver implements StorageDriver {
     } catch (err) {
       throw new StorageError('S3 bucket is not reachable', err);
     }
+  }
+
+  /**
+   * Sums object sizes by listing the bucket (1,000 objects per request). Listing is a billed
+   * "class C" call on B2 and S3, so callers should run it rarely; `maxPages` bounds the cost.
+   */
+  async measureUsage(opts: { maxPages?: number } = {}): Promise<UsageInfo> {
+    const maxPages = opts.maxPages ?? 100;
+    let bytes = 0;
+    let objects = 0;
+    let token: string | undefined;
+    for (let page = 0; page < maxPages; page++) {
+      const res = await this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: this.prefix ? `${this.prefix}/` : undefined, ContinuationToken: token, MaxKeys: 1000 }));
+      for (const o of res.Contents ?? []) {
+        bytes += o.Size ?? 0;
+        objects++;
+      }
+      if (!res.IsTruncated || !res.NextContinuationToken) return { bytes, objects, partial: false };
+      token = res.NextContinuationToken;
+    }
+    return { bytes, objects, partial: true };
   }
 
   async capacity(): Promise<CapacityInfo> {

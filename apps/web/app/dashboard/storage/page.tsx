@@ -40,6 +40,10 @@ interface Provider {
   cost_egress_per_gb: number;
   cost_per_million_requests: number;
   health_status: string;
+  bucket_used: number | null;
+  bucket_objects: number | null;
+  bucket_usage_partial: boolean;
+  usage_checked_at: string | null;
   latency_ms: number | null;
 }
 interface StorageStats {
@@ -62,7 +66,9 @@ interface StorageStats {
     free: number;
     used: number;
     online_servers: number;
-    servers: { name: string; role: 'main' | 'node'; status: string; total: number | null; free: number | null; used: number | null }[];
+    server_count: number;
+    cloud_count: number;
+    servers: { name: string; role: 'main' | 'node' | 'cloud'; kind?: string; status: string; total: number | null; free: number | null; used: number | null; objects?: number | null; checked_at?: string | null; partial?: boolean }[];
   };
 }
 
@@ -292,13 +298,13 @@ export default function StoragePage() {
           {d.cluster.servers.length > 1 && (
             <Panel className="mb-8 p-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold">Combined storage across all servers</h3>
+                <h3 className="text-sm font-semibold">{d.cluster.cloud_count ? 'Combined storage across servers and cloud' : 'Combined storage across all servers'}</h3>
                 <span className="text-sm tabular">
                   <span className="font-semibold">{formatBytes(d.cluster.total)}</span> total · {formatBytes(d.cluster.used)} used · {formatBytes(d.cluster.free)} free
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                This server&apos;s disk plus every storage node ({d.cluster.online_servers} of {d.cluster.servers.length} online). Raw disk space: how much of it files can use depends on the RAID level of each pool — see{' '}
+                This server&apos;s disk plus every storage node{d.cluster.cloud_count ? ' and cloud bucket' : ''} ({d.cluster.online_servers} of {d.cluster.servers.length} online). Disks are raw space (how much files can use depends on each pool&apos;s RAID level); cloud buckets count their configured quota, with usage measured from the bucket every 30 minutes — see{' '}
                 <Link href="/dashboard/nodes" className="underline">
                   Nodes &amp; RAID
                 </Link>
@@ -309,11 +315,28 @@ export default function StoragePage() {
                   const pct = srv.total && srv.used !== null ? Math.min(100, (srv.used / srv.total) * 100) : 0;
                   return (
                     <div key={srv.name} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm">
-                      <StatusDot status={srv.status === 'online' ? 'ok' : srv.status === 'offline' ? 'fail' : 'idle'} label={<span className="truncate">{srv.name}</span>} />
+                      <StatusDot
+                        status={srv.status === 'online' ? 'ok' : srv.status === 'offline' ? 'fail' : 'idle'}
+                        label={
+                          <span className="truncate">
+                            {srv.name}
+                            {srv.role === 'cloud' && <span className="ml-1 text-xs text-muted-foreground">{({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[srv.kind ?? ''] ?? srv.kind}</span>}
+                          </span>
+                        }
+                      />
                       <div className="h-2 overflow-hidden rounded bg-muted" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${srv.name} disk usage`}>
                         <div className={pct > 90 ? 'h-full bg-destructive' : pct > 75 ? 'h-full bg-warning' : 'h-full bg-[var(--series-1)]'} style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="tabular text-xs text-muted-foreground">{srv.total === null ? 'Unknown' : `${formatBytes(srv.free ?? 0)} free of ${formatBytes(srv.total)}`}</span>
+                      <span
+                        className="tabular text-xs text-muted-foreground"
+                        title={srv.role === 'cloud' ? `${srv.objects ?? 0} objects${srv.partial ? ' (bucket scan incomplete)' : ''}${srv.checked_at ? ` · scanned ${new Date(srv.checked_at).toLocaleString()}` : ' · not scanned yet'}` : undefined}
+                      >
+                        {srv.total === null
+                          ? srv.role === 'cloud'
+                            ? `${formatBytes(srv.used ?? 0)} used · no quota set`
+                            : 'Unknown'
+                          : `${formatBytes(srv.free ?? 0)} free of ${formatBytes(srv.total)}${srv.role === 'cloud' ? ' quota' : ''}`}
+                      </span>
                     </div>
                   );
                 })}
@@ -371,7 +394,10 @@ export default function StoragePage() {
                       <TD>{p.kind}</TD>
                       <TD className="max-w-[260px] truncate font-mono text-xs text-muted-foreground">{p.kind === 'POOL' ? <Link href="/dashboard/nodes" className="hover:underline">{p.public_info.level} · {p.public_info.nodes} nodes</Link> : p.public_info.root ?? [p.public_info.bucket, p.public_info.endpoint].filter(Boolean).join(' @ ')}</TD>
                       <TD className="text-right tabular">{formatNumber(p.file_count)}</TD>
-                      <TD className="text-right tabular">{formatBytes(p.used)}</TD>
+                      <TD className="text-right tabular" title={p.bucket_used !== null ? `CDN files: ${formatBytes(p.used)} · whole bucket: ${formatBytes(p.bucket_used)} in ${formatNumber(p.bucket_objects ?? 0)} objects${p.bucket_usage_partial ? ' (scan incomplete)' : ''}${p.usage_checked_at ? ` · scanned ${new Date(p.usage_checked_at).toLocaleString()}` : ''}` : undefined}>
+                        {formatBytes(p.used)}
+                        {p.bucket_used !== null && p.bucket_used !== p.used && <div className="text-xs text-muted-foreground">bucket {formatBytes(p.bucket_used)}</div>}
+                      </TD>
                       <TD className="text-right tabular" title={p.kind === 'LOCAL' ? 'Includes available volume space and configured quota' : 'Cloud storage quota only; physical free space is unknown'}>{p.available === null ? 'Unknown' : formatBytes(p.available)}</TD>
                       <TD>{p.enabled ? <Badge tone="success">Enabled</Badge> : <Badge>Disabled</Badge>}</TD>
                       <TD>

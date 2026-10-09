@@ -247,6 +247,12 @@ model StorageProvider {
   healthStatus           String        @default("unknown")
   healthCheckedAt        DateTime?
   latencyMs              Int?
+  /// Object storage: bytes / objects found in the bucket at the last usage scan (includes non-CDN data).
+  bucketUsedBytes        BigInt?
+  bucketObjectCount      Int?
+  /// The scan stopped at its page limit, so the figures are a lower bound.
+  bucketUsagePartial     Boolean       @default(false)
+  usageCheckedAt         DateTime?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
   files                  File[]

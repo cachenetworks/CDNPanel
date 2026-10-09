@@ -28,22 +28,31 @@ export async function providerSpace(provider: StorageProvider, logicalUsed: numb
 
 export interface ClusterServer {
   name: string;
-  /** `main` = this CDN server's own storage disk; `node` = a remote storage node. */
-  role: 'main' | 'node';
+  /** `main` = this CDN server's own storage disk; `node` = a remote storage node; `cloud` = an object-storage bucket. */
+  role: 'main' | 'node' | 'cloud';
+  /** Provider kind for cloud buckets (S3, R2, B2, MINIO). */
+  kind?: string;
   status: string;
+  /** For cloud buckets: the quota configured on the provider (object storage has no fixed size). */
   total: number | null;
   free: number | null;
   used: number | null;
+  /** Cloud buckets: objects in the bucket at the last scan, and when that was. */
+  objects?: number | null;
+  checked_at?: string | null;
+  partial?: boolean;
 }
 
 /**
- * Physical storage across every server: this CDN server's disk plus each remote storage node's disk
- * (as last reported by the node health check). Local-directory nodes live on this server's disk and
- * are not counted twice.
+ * Storage across every server and bucket: this CDN server's disk, each remote storage node's disk
+ * (as last reported by the node health check), and each enabled cloud bucket (its configured quota,
+ * with usage from the periodic bucket scan). Local-directory nodes live on this server's disk and
+ * are not counted twice. Buckets without a quota have no size to add, so they count as used only.
  */
-export async function clusterStorage(): Promise<{ total: number; free: number; used: number; servers: ClusterServer[]; online_servers: number }> {
+export async function clusterStorage(): Promise<{ total: number; free: number; used: number; servers: ClusterServer[]; online_servers: number; server_count: number; cloud_count: number }> {
   const prisma = getPrisma();
-  const main = (await prisma.storageProvider.findMany({ where: { kind: 'LOCAL', enabled: true }, orderBy: { createdAt: 'asc' } })).find((p) => (p.publicInfo as Record<string, string>).source === 'environment');
+  const providers = await prisma.storageProvider.findMany({ where: { enabled: true }, orderBy: { createdAt: 'asc' } });
+  const main = providers.find((p) => p.kind === 'LOCAL' && (p.publicInfo as Record<string, string>).source === 'environment');
   const servers: ClusterServer[] = [];
   if (main) {
     const disk = await driverFor(main).capacity().catch(() => ({ total: null, available: null }));
@@ -55,6 +64,35 @@ export async function clusterStorage(): Promise<{ total: number; free: number; u
     const free = n.freeBytes === null ? null : Number(n.freeBytes);
     servers.push({ name: n.name, role: 'node', status: n.enabled ? n.status : 'disabled', total, free, used: total !== null && free !== null ? total - free : null });
   }
+  const cloud = providers.filter((p) => p.kind !== 'LOCAL' && p.kind !== 'POOL');
+  if (cloud.length) {
+    const logical = await prisma.file.groupBy({ by: ['storageProviderId'], where: { storageProviderId: { in: cloud.map((p) => p.id) } }, _sum: { size: true } });
+    for (const p of cloud) {
+      // Prefer the measured bucket size (includes anything not uploaded through the CDN).
+      const used = p.bucketUsedBytes !== null ? Number(p.bucketUsedBytes) : Number(logical.find((x) => x.storageProviderId === p.id)?._sum.size ?? 0);
+      const total = p.capacity === null ? null : Number(p.capacity);
+      servers.push({
+        name: p.name,
+        role: 'cloud',
+        kind: p.kind,
+        status: p.healthStatus === 'healthy' ? 'online' : p.healthStatus === 'unhealthy' ? 'offline' : 'unknown',
+        total,
+        free: total === null ? null : Math.max(0, total - used),
+        used,
+        objects: p.bucketObjectCount,
+        checked_at: p.usageCheckedAt?.toISOString() ?? null,
+        partial: p.bucketUsagePartial,
+      });
+    }
+  }
   const sum = (k: 'total' | 'free' | 'used') => servers.reduce((a, s) => a + (s[k] ?? 0), 0);
-  return { total: sum('total'), free: sum('free'), used: sum('used'), servers, online_servers: servers.filter((s) => s.status === 'online').length };
+  return {
+    total: sum('total'),
+    free: sum('free'),
+    used: sum('used'),
+    servers,
+    online_servers: servers.filter((s) => s.status === 'online').length,
+    server_count: servers.filter((s) => s.role !== 'cloud').length,
+    cloud_count: servers.filter((s) => s.role === 'cloud').length,
+  };
 }

@@ -27,6 +27,11 @@ interface Overview {
     cluster_used: number;
     cluster_servers: number;
     cluster_online_servers: number;
+    cluster_server_count: number;
+    cluster_cloud_count: number;
+    default_is_cloud: boolean;
+    default_provider_name: string;
+    default_provider_kind: string;
     uploads_today: number;
     downloads_today: number;
     views_today: number;
@@ -96,9 +101,13 @@ export default function OverviewPage() {
               <Stat label="Total files" value={formatNumber(d.stats.total_files)} />
               <Stat label="CDN storage used" value={formatBytes(d.stats.storage_used)} sub="CDN-managed files across all providers" />
               {d.stats.cluster_servers > 1 && (
-                <Stat label="Total storage (all servers)" value={formatBytes(d.stats.cluster_total)} sub={`${formatBytes(d.stats.cluster_free)} free across ${d.stats.cluster_servers} servers${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`} />
+                <Stat
+                  label={d.stats.cluster_cloud_count ? 'Total storage (servers & cloud)' : 'Total storage (all servers)'}
+                  value={formatBytes(d.stats.cluster_total)}
+                  sub={`${formatBytes(d.stats.cluster_free)} free across ${d.stats.cluster_server_count} server${d.stats.cluster_server_count === 1 ? '' : 's'}${d.stats.cluster_cloud_count ? ` + ${d.stats.cluster_cloud_count} cloud bucket${d.stats.cluster_cloud_count === 1 ? '' : 's'}` : ''}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
+                />
               )}
-              <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.disk_free !== null ? `${formatBytes(d.stats.disk_free)} host disk free` : 'Provider has not reported physical free space'} />
+              <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.default_is_cloud ? `${d.stats.default_provider_name} quota (${({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[d.stats.default_provider_kind] ?? d.stats.default_provider_kind})` : d.stats.disk_free !== null ? `${formatBytes(d.stats.disk_free)} host disk free` : 'Provider has not reported physical free space'} />
               <Stat label="Uploads today" value={formatNumber(d.stats.uploads_today)} />
               <Stat label="Downloads today" value={formatNumber(d.stats.downloads_today)} />
               <Stat label="File views today" value={formatNumber(d.stats.views_today)} />

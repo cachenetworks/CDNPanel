@@ -15,6 +15,7 @@ import { closeRedis, getRedis } from '../src/lib/redis.js';
 import { flushRequests } from '../src/lib/requestLog.js';
 import { ensureDefaultProvider } from '../src/lib/storageRegistry.js';
 import { checkNodes, runPoolRepair } from '../src/services/storageNodes.js';
+import { clusterStorage } from '../src/services/storageCapacity.js';
 
 /** Storage nodes + RAID pools through the HTTP API, against real node agents. */
 
@@ -133,6 +134,33 @@ describe('storage nodes and RAID pools', () => {
     expect(overview.statusCode, overview.body).toBe(200);
     expect(overview.json().stats.cluster_total).toBe(cluster.total);
     expect(overview.json().stats.cluster_servers).toBe(cluster.servers.length);
+  });
+
+  it('counts cloud buckets by their quota and measured usage', async () => {
+    const prisma = getPrisma();
+    const before = await clusterStorage();
+    const id = newId('storageProvider');
+    const noQuota = newId('storageProvider');
+    const GB = 1024 ** 3;
+    await prisma.storageProvider.createMany({
+      data: [
+        { id, name: 'cloud-b2', kind: 'B2', configEnc: 'x', capacity: BigInt(10 * GB), healthStatus: 'healthy', bucketUsedBytes: BigInt(3 * GB), bucketObjectCount: 42, usageCheckedAt: new Date() },
+        { id: noQuota, name: 'cloud-r2', kind: 'R2', configEnc: 'x', healthStatus: 'healthy', bucketUsedBytes: BigInt(GB), bucketObjectCount: 7 },
+      ],
+    });
+    try {
+      const after = await clusterStorage();
+      const b2 = after.servers.find((x) => x.name === 'cloud-b2')!;
+      expect(b2).toMatchObject({ role: 'cloud', kind: 'B2', status: 'online', total: 10 * GB, used: 3 * GB, free: 7 * GB, objects: 42 });
+      const r2 = after.servers.find((x) => x.name === 'cloud-r2')!;
+      expect(r2).toMatchObject({ role: 'cloud', total: null, free: null, used: GB });
+      expect(after.cloud_count).toBe(before.cloud_count + 2);
+      // A bucket without a quota has no size to add; one with a quota adds its quota.
+      expect(after.total - before.total).toBe(10 * GB);
+      expect(after.free - before.free).toBe(7 * GB);
+    } finally {
+      await prisma.storageProvider.deleteMany({ where: { id: { in: [id, noQuota] } } });
+    }
   });
 
   it('validates RAID layouts', async () => {

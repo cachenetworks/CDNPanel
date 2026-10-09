@@ -20,6 +20,7 @@ import {
 } from '../lib/storageRegistry.js';
 import { getSettings } from '../lib/settings.js';
 import { clusterStorage, providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
+import { measureBucketUsage } from '../services/replication.js';
 
 const providerParams = z.object({ id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') });
 
@@ -98,6 +99,11 @@ async function providerSummaries() {
         health_status: p.healthStatus,
         health_checked_at: p.healthCheckedAt?.toISOString() ?? null,
         latency_ms: p.latencyMs,
+        // Object storage: what the bucket really holds (last scan), including non-CDN objects.
+        bucket_used: p.bucketUsedBytes === null ? null : Number(p.bucketUsedBytes),
+        bucket_objects: p.bucketObjectCount,
+        bucket_usage_partial: p.bucketUsagePartial,
+        usage_checked_at: p.usageCheckedAt,
         created_at: p.createdAt.toISOString(),
         updated_at: p.updatedAt.toISOString(),
       };
@@ -267,6 +273,8 @@ export const storageRoutes: RouteDef<any, any, any>[] = [
       if (!p) throw new AppError('storage_provider_not_found');
       try {
         await driverFor(p).healthCheck();
+        // Refresh the bucket usage figures too (object storage only).
+        await measureBucketUsage(p, true).catch(() => undefined);
         return { ok: true };
       } catch (err) {
         return { ok: false, error: (err as Error).message.slice(0, 200) };

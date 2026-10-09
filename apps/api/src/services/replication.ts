@@ -23,6 +23,22 @@ export async function providerMap(): Promise<Map<string, StorageProvider>> {
 }
 
 /** Runs each enabled provider's health check and records status and latency (worker job). */
+/** How often object-storage buckets are listed to measure usage (listing is a billed request on B2 / S3). */
+const USAGE_SCAN_INTERVAL_MS = 30 * 60_000;
+
+/** Records how much a cloud bucket really holds, at most every 30 minutes per provider. */
+export async function measureBucketUsage(p: StorageProvider, force = false): Promise<void> {
+  if (p.kind === 'LOCAL' || p.kind === 'POOL') return;
+  if (!force && p.usageCheckedAt && Date.now() - p.usageCheckedAt.getTime() < USAGE_SCAN_INTERVAL_MS) return;
+  const driver = driverFor(p);
+  if (!driver.measureUsage) return;
+  const usage = await driver.measureUsage({ maxPages: 100 });
+  await getPrisma().storageProvider.update({
+    where: { id: p.id },
+    data: { bucketUsedBytes: BigInt(usage.bytes), bucketObjectCount: usage.objects, bucketUsagePartial: usage.partial, usageCheckedAt: new Date() },
+  });
+}
+
 export async function checkProviderHealth(): Promise<void> {
   const prisma = getPrisma();
   for (const p of await prisma.storageProvider.findMany({ where: { enabled: true } })) {
@@ -35,6 +51,7 @@ export async function checkProviderHealth(): Promise<void> {
       log.warn({ provider_id: p.id, err: (err as Error).message }, 'storage provider unhealthy');
     }
     await prisma.storageProvider.update({ where: { id: p.id }, data: { healthStatus: status, healthCheckedAt: new Date(), latencyMs: Date.now() - started } });
+    await measureBucketUsage(p).catch((err: unknown) => log.warn({ provider_id: p.id, err: (err as Error).message }, 'bucket usage scan failed'));
   }
   providers = null;
 }

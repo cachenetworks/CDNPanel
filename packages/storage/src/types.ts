@@ -34,6 +34,14 @@ export interface CapacityInfo {
   total: number | null;
 }
 
+/** Bytes and objects actually stored in a bucket (object storage only). */
+export interface UsageInfo {
+  bytes: number;
+  objects: number;
+  /** True when the listing stopped at the page limit, so the numbers are a lower bound. */
+  partial: boolean;
+}
+
 export interface StorageDriver {
   readonly kind: StorageKind;
   put(key: string, body: Readable | Buffer, opts: PutOptions): Promise<void>;
@@ -50,6 +58,8 @@ export interface StorageDriver {
   resolvePath?(key: string): string;
   /** Every object key under `prefix`, in no particular order (local, node and pool drivers). */
   listKeys?(prefix?: string): AsyncIterable<string>;
+  /** Measures what is stored (object storage: by listing the bucket, within the provider's prefix). */
+  measureUsage?(opts?: { maxPages?: number }): Promise<UsageInfo>;
 }
 
 export class StorageError extends Error {
