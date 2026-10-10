@@ -104,8 +104,13 @@ export default function OverviewPage() {
               <Stat label="CDN storage used" value={formatBytes(d.stats.storage_used)} sub="CDN-managed files across all providers" />
               <Stat
                 label="Total storage"
-                value={formatBytes(d.stats.cluster_total)}
-                sub={`${formatBytes(d.stats.cluster_free)} free · ${['this server', d.stats.cluster_pool_count && `${d.stats.cluster_pool_count} pool${d.stats.cluster_pool_count === 1 ? '' : 's'}`, d.stats.cluster_cloud_count && `${d.stats.cluster_cloud_count} cloud`].filter(Boolean).join(' + ')}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
+                value={
+                  <>
+                    {formatBytes(d.stats.cluster_total)}
+                    <span className="ml-2 text-sm font-medium text-[hsl(var(--success))]">{formatBytes(d.stats.cluster_free)} free</span>
+                  </>
+                }
+                sub={`${['this server', d.stats.cluster_pool_count && `${d.stats.cluster_pool_count} pool${d.stats.cluster_pool_count === 1 ? '' : 's'}`, d.stats.cluster_cloud_count && `${d.stats.cluster_cloud_count} cloud`].filter(Boolean).join(' + ')}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
               />
               <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.default_is_cloud ? `New uploads: ${d.stats.default_provider_name} quota (${({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[d.stats.default_provider_kind] ?? d.stats.default_provider_kind})` : `New uploads: ${d.stats.default_provider_name}${d.stats.disk_free !== null ? ` · ${formatBytes(d.stats.disk_free)} disk free` : ''}`} />
               <Stat label="Uploads today" value={formatNumber(d.stats.uploads_today)} />
