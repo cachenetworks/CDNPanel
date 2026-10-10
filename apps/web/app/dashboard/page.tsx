@@ -107,7 +107,15 @@ export default function OverviewPage() {
                 value={
                   <>
                     {formatBytes(d.stats.cluster_total)}
-                    <span className="ml-2 text-sm font-medium text-[hsl(var(--success))]">{formatBytes(d.stats.cluster_free)} free</span>
+                    <span
+                      className={`ml-2 text-sm font-medium ${(() => {
+                        const pct = d.stats.cluster_total > 0 ? d.stats.cluster_free / d.stats.cluster_total : 0;
+                        return pct < 0.1 ? 'text-destructive' : pct < 0.25 ? 'text-[hsl(var(--warning))]' : 'text-[hsl(var(--success))]';
+                      })()}`}
+                      title={d.stats.cluster_total > 0 ? `${Math.round((d.stats.cluster_free / d.stats.cluster_total) * 100)}% free` : undefined}
+                    >
+                      {formatBytes(d.stats.cluster_free)} free
+                    </span>
                   </>
                 }
                 sub={`${['this server', d.stats.cluster_pool_count && `${d.stats.cluster_pool_count} pool${d.stats.cluster_pool_count === 1 ? '' : 's'}`, d.stats.cluster_cloud_count && `${d.stats.cluster_cloud_count} cloud`].filter(Boolean).join(' + ')}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
