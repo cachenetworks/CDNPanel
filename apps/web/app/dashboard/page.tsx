@@ -29,6 +29,8 @@ interface Overview {
     cluster_online_servers: number;
     cluster_server_count: number;
     cluster_cloud_count: number;
+    cluster_pool_count: number;
+    cluster_unassigned_nodes: number;
     default_is_cloud: boolean;
     default_provider_name: string;
     default_provider_kind: string;
@@ -100,14 +102,12 @@ export default function OverviewPage() {
             <>
               <Stat label="Total files" value={formatNumber(d.stats.total_files)} />
               <Stat label="CDN storage used" value={formatBytes(d.stats.storage_used)} sub="CDN-managed files across all providers" />
-              {d.stats.cluster_servers > 1 && (
-                <Stat
-                  label={d.stats.cluster_cloud_count ? 'Total storage (servers & cloud)' : 'Total storage (all servers)'}
-                  value={formatBytes(d.stats.cluster_total)}
-                  sub={`${formatBytes(d.stats.cluster_free)} free across ${d.stats.cluster_server_count} server${d.stats.cluster_server_count === 1 ? '' : 's'}${d.stats.cluster_cloud_count ? ` + ${d.stats.cluster_cloud_count} cloud bucket${d.stats.cluster_cloud_count === 1 ? '' : 's'}` : ''}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
-                />
-              )}
-              <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.default_is_cloud ? `${d.stats.default_provider_name} quota (${({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[d.stats.default_provider_kind] ?? d.stats.default_provider_kind})` : d.stats.disk_free !== null ? `${formatBytes(d.stats.disk_free)} host disk free` : 'Provider has not reported physical free space'} />
+              <Stat
+                label="Total storage"
+                value={formatBytes(d.stats.cluster_total)}
+                sub={`${formatBytes(d.stats.cluster_free)} free · ${['this server', d.stats.cluster_pool_count && `${d.stats.cluster_pool_count} pool${d.stats.cluster_pool_count === 1 ? '' : 's'}`, d.stats.cluster_cloud_count && `${d.stats.cluster_cloud_count} cloud`].filter(Boolean).join(' + ')}${d.stats.cluster_online_servers < d.stats.cluster_servers ? ` (${d.stats.cluster_servers - d.stats.cluster_online_servers} offline)` : ''}`}
+              />
+              <Stat label="Upload headroom" value={d.stats.storage_available !== null ? formatBytes(d.stats.storage_available) : 'Unknown'} sub={d.stats.default_is_cloud ? `New uploads: ${d.stats.default_provider_name} quota (${({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[d.stats.default_provider_kind] ?? d.stats.default_provider_kind})` : `New uploads: ${d.stats.default_provider_name}${d.stats.disk_free !== null ? ` · ${formatBytes(d.stats.disk_free)} disk free` : ''}`} />
               <Stat label="Uploads today" value={formatNumber(d.stats.uploads_today)} />
               <Stat label="Downloads today" value={formatNumber(d.stats.downloads_today)} />
               <Stat label="File views today" value={formatNumber(d.stats.views_today)} />

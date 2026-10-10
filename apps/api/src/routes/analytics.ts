@@ -157,6 +157,8 @@ export const analyticsRoutes: RouteDef<any, any, any>[] = [
           cluster_servers: cluster.servers.length,
           cluster_server_count: cluster.server_count,
           cluster_cloud_count: cluster.cloud_count,
+          cluster_pool_count: cluster.pool_count,
+          cluster_unassigned_nodes: cluster.unassigned_nodes,
           // The upload default is object storage: its headroom is a configured quota, not disk space.
           default_is_cloud: provider.kind !== 'LOCAL' && provider.kind !== 'POOL',
           default_provider_name: provider.name,

@@ -125,6 +125,16 @@ func (c *Client) MoveAFile(ctx context.Context, id string, body any) (*Response,
 	return c.do(ctx, "POST", fmt.Sprintf("/api/v1/files/%s/move", url.PathEscape(id)), nil, body, nil, nil)
 }
 
+// OpenATextFileForEditing: Open a text file for editing (GET /api/v1/files/{id}/text).
+func (c *Client) OpenATextFileForEditing(ctx context.Context, id string) (*Response, error) {
+	return c.do(ctx, "GET", fmt.Sprintf("/api/v1/files/%s/text", url.PathEscape(id)), nil, nil, nil, nil)
+}
+
+// SaveAnEditedTextFile: Save an edited text file (PUT /api/v1/files/{id}/text).
+func (c *Client) SaveAnEditedTextFile(ctx context.Context, id string, body any) (*Response, error) {
+	return c.do(ctx, "PUT", fmt.Sprintf("/api/v1/files/%s/text", url.PathEscape(id)), nil, body, nil, nil)
+}
+
 // ListFolders: List folders (GET /api/v1/folders).
 func (c *Client) ListFolders(ctx context.Context, query url.Values) (*Response, error) {
 	return c.do(ctx, "GET", "/api/v1/folders", query, nil, nil, nil)

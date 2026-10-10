@@ -46,6 +46,49 @@ interface Provider {
   usage_checked_at: string | null;
   latency_ms: number | null;
 }
+interface StorageOption {
+  id: string;
+  name: string;
+  role: 'main' | 'local' | 'pool' | 'node' | 'cloud';
+  kind: string;
+  status: string;
+  counted: boolean;
+  is_default: boolean;
+  total: number | null;
+  free: number | null;
+  used: number | null;
+  level?: string;
+  nodes?: string[];
+  raw_total?: number | null;
+  objects?: number | null;
+  checked_at?: string | null;
+  partial?: boolean;
+}
+
+const CLOUD_NAMES: Record<string, string> = { S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' };
+
+function optionKind(o: StorageOption): string {
+  switch (o.role) {
+    case 'main':
+      return 'This server';
+    case 'local':
+      return 'Local volume';
+    case 'pool':
+      return `${(o.level ?? '').replace('RAID', 'RAID ')} pool · ${o.nodes?.length ?? 0} node${o.nodes?.length === 1 ? '' : 's'}`;
+    case 'cloud':
+      return CLOUD_NAMES[o.kind] ?? o.kind;
+    case 'node':
+      return 'Node (not in a pool)';
+  }
+}
+
+function optionDetail(o: StorageOption): string | undefined {
+  if (o.role === 'pool') return `Nodes: ${o.nodes?.join(', ')}${o.raw_total ? ` · ${formatBytes(o.raw_total)} raw disk before RAID` : ''}`;
+  if (o.role === 'cloud') return `${formatNumber(o.objects ?? 0)} objects in the bucket${o.partial ? ' (scan incomplete)' : ''}${o.checked_at ? ` · scanned ${new Date(o.checked_at).toLocaleString()}` : ' · not scanned yet'}`;
+  if (o.role === 'node') return 'Add this node to a pool to store files on it.';
+  return undefined;
+}
+
 interface StorageStats {
   used: number;
   quota: number | null;
@@ -67,8 +110,10 @@ interface StorageStats {
     used: number;
     online_servers: number;
     server_count: number;
+    pool_count: number;
     cloud_count: number;
-    servers: { name: string; role: 'main' | 'node' | 'cloud'; kind?: string; status: string; total: number | null; free: number | null; used: number | null; objects?: number | null; checked_at?: string | null; partial?: boolean }[];
+    unassigned_nodes: number;
+    servers: StorageOption[];
   };
 }
 
@@ -283,68 +328,63 @@ export default function StoragePage() {
         <>
           <div className="mb-8 grid grid-cols-2 divide-x divide-y rounded-lg border md:grid-cols-5">
             {[
-              ['Storage used', formatBytes(d.used)],
-              ['Upload headroom', d.available !== null ? formatBytes(d.available) : 'Unknown'],
-              ['Files', formatNumber(d.file_count)],
-              ['Average file size', formatBytes(d.average_file_size)],
-              ['Default backend', d.default_backend ? `${d.default_backend.name} (${d.default_backend.kind})` : '—'],
-            ].map(([k, v]) => (
+              ['Total storage', formatBytes(d.cluster.total), 'Usable space across every storage option'],
+              ['Free', formatBytes(d.cluster.free), `${formatBytes(d.cluster.used)} in use (all data, not only CDN files)`],
+              ['CDN files', formatBytes(d.used), `${formatNumber(d.file_count)} files · avg ${formatBytes(d.average_file_size)}`],
+              ['Upload headroom', d.available !== null ? formatBytes(d.available) : 'Unknown', d.default_backend ? `New uploads go to ${d.default_backend.name}` : undefined],
+              ['Storage options', String(d.cluster.servers.filter((o) => o.counted).length), [d.cluster.pool_count && `${d.cluster.pool_count} pool${d.cluster.pool_count === 1 ? '' : 's'}`, d.cluster.cloud_count && `${d.cluster.cloud_count} cloud`, d.cluster.unassigned_nodes && `${d.cluster.unassigned_nodes} unassigned node${d.cluster.unassigned_nodes === 1 ? '' : 's'}`].filter(Boolean).join(' · ') || undefined],
+            ].map(([k, v, sub]) => (
               <div key={k} className="px-4 py-3">
                 <div className="text-xs text-muted-foreground">{k}</div>
                 <div className="mt-1 truncate text-lg font-semibold tabular">{v}</div>
+                {sub && <div className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</div>}
               </div>
             ))}
           </div>
-          {d.cluster.servers.length > 1 && (
-            <Panel className="mb-8 p-4">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h3 className="text-sm font-semibold">{d.cluster.cloud_count ? 'Combined storage across servers and cloud' : 'Combined storage across all servers'}</h3>
-                <span className="text-sm tabular">
-                  <span className="font-semibold">{formatBytes(d.cluster.total)}</span> total · {formatBytes(d.cluster.used)} used · {formatBytes(d.cluster.free)} free
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                This server&apos;s disk plus every storage node{d.cluster.cloud_count ? ' and cloud bucket' : ''} ({d.cluster.online_servers} of {d.cluster.servers.length} online). Disks are raw space (how much files can use depends on each pool&apos;s RAID level); cloud buckets count their configured quota, with usage measured from the bucket every 30 minutes — see{' '}
-                <Link href="/dashboard/nodes" className="underline">
-                  Nodes &amp; RAID
-                </Link>
-                .
-              </p>
-              <div className="mt-3 space-y-2">
-                {d.cluster.servers.map((srv) => {
-                  const pct = srv.total && srv.used !== null ? Math.min(100, (srv.used / srv.total) * 100) : 0;
-                  return (
-                    <div key={srv.name} className="grid grid-cols-[minmax(0,10rem)_1fr_auto] items-center gap-3 text-sm">
+          <Panel className="mb-8 p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-sm font-semibold">Space by storage option</h3>
+              <span className="text-sm tabular">
+                <span className="font-semibold">{formatBytes(d.cluster.total)}</span> usable · {formatBytes(d.cluster.used)} used · {formatBytes(d.cluster.free)} free
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Counted the way files can use it: this server&apos;s disk, each RAID pool&apos;s usable space after mirroring or parity, and each cloud bucket&apos;s quota (usage measured from the bucket every 30 minutes). Nodes outside a pool are listed but not counted. Manage nodes and pools in{' '}
+              <Link href="/dashboard/nodes" className="underline">
+                Nodes &amp; RAID
+              </Link>
+              .
+            </p>
+            <div className="mt-3 space-y-2.5">
+              {d.cluster.servers.map((o) => {
+                const pct = o.total && o.used !== null ? Math.min(100, (o.used / o.total) * 100) : 0;
+                return (
+                  <div key={o.id} className={`grid grid-cols-[minmax(0,14rem)_1fr_auto] items-center gap-3 text-sm${o.counted ? '' : ' opacity-60'}`} title={optionDetail(o)}>
+                    <div className="min-w-0">
                       <StatusDot
-                        status={srv.status === 'online' ? 'ok' : srv.status === 'offline' ? 'fail' : 'idle'}
+                        status={o.status === 'online' ? 'ok' : o.status === 'offline' ? 'fail' : o.status === 'degraded' ? 'warn' : 'idle'}
                         label={
                           <span className="truncate">
-                            {srv.name}
-                            {srv.role === 'cloud' && <span className="ml-1 text-xs text-muted-foreground">{({ S3: 'Amazon S3', R2: 'Cloudflare R2', B2: 'Backblaze B2', MINIO: 'MinIO' } as Record<string, string>)[srv.kind ?? ''] ?? srv.kind}</span>}
+                            {o.name} {o.is_default && <Badge tone="info">Default</Badge>}
                           </span>
                         }
                       />
-                      <div className="h-2 overflow-hidden rounded bg-muted" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${srv.name} disk usage`}>
-                        <div className={pct > 90 ? 'h-full bg-destructive' : pct > 75 ? 'h-full bg-warning' : 'h-full bg-[var(--series-1)]'} style={{ width: `${pct}%` }} />
-                      </div>
-                      <span
-                        className="tabular text-xs text-muted-foreground"
-                        title={srv.role === 'cloud' ? `${srv.objects ?? 0} objects${srv.partial ? ' (bucket scan incomplete)' : ''}${srv.checked_at ? ` · scanned ${new Date(srv.checked_at).toLocaleString()}` : ' · not scanned yet'}` : undefined}
-                      >
-                        {srv.total === null
-                          ? srv.role === 'cloud'
-                            ? `${formatBytes(srv.used ?? 0)} used · no quota set`
-                            : 'Unknown'
-                          : `${formatBytes(srv.free ?? 0)} free of ${formatBytes(srv.total)}${srv.role === 'cloud' ? ' quota' : ''}`}
-                      </span>
+                      <div className="truncate pl-3.5 text-xs text-muted-foreground">{optionKind(o)}</div>
                     </div>
-                  );
-                })}
-              </div>
-            </Panel>
-          )}
+                    <div className="h-2 overflow-hidden rounded bg-muted" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={`${o.name} usage`}>
+                      <div className={pct > 90 ? 'h-full bg-destructive' : pct > 75 ? 'h-full bg-warning' : 'h-full bg-[var(--series-1)]'} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="tabular text-right text-xs text-muted-foreground">
+                      {o.total === null ? (o.role === 'cloud' ? `${formatBytes(o.used ?? 0)} used · no quota set` : 'Unknown') : `${formatBytes(o.free ?? 0)} free of ${formatBytes(o.total)}${o.role === 'cloud' ? ' quota' : ''}`}
+                      {!o.counted && o.total !== null && <div>not counted</div>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
           <Panel className="mb-8 p-4">
-            <h3 className="text-sm font-semibold">Default backend disk usage</h3>
+            <h3 className="text-sm font-semibold">Default backend disk usage{d.default_backend ? ` — ${d.default_backend.name}` : ''}</h3>
             <p className="mt-1 text-xs text-muted-foreground">Local disk usage includes all other server applications and files. CDN usage is logical file size; other usage is estimated. Cloud providers may not report physical capacity.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-4">
               <div><div className="text-xs text-muted-foreground">Volume total</div><div className="font-semibold">{d.disk_total === null ? 'Unknown' : formatBytes(d.disk_total)}</div></div>

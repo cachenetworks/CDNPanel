@@ -19176,6 +19176,533 @@
         ]
       }
     },
+    "/api/v1/files/{id}/text": {
+      "get": {
+        "operationId": "get_api_v1_files_id_text",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Open a text file for editing",
+        "description": "Returns the content of a text file (UTF-8, up to 2 MB) together with its current `version`, which must be sent back when saving.",
+        "security": [
+          {
+            "bearerAuth": [
+              "files:read"
+            ]
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Text content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated, invalid_api_key, api_key_revoked, api_key_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "The supplied API key is invalid.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_revoked": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_revoked",
+                        "message": "The supplied API key has been revoked.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_expired": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_expired",
+                        "message": "The supplied API key has expired.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: insufficient_scope, forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "insufficient_scope": {
+                    "value": {
+                      "error": {
+                        "code": "insufficient_scope",
+                        "message": "The API key does not have the required scope.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: file_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_found",
+                        "message": "The requested file could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: file_not_ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_ready": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_ready",
+                        "message": "The file is not available yet.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "any",
+        "x-required-permissions": [
+          "files.view"
+        ],
+        "x-required-scopes": [
+          "files:read"
+        ],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "put_api_v1_files_id_text",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Save an edited text file",
+        "description": "Saves new text content as a new revision: the file keeps its id and URLs, the previous content stays in the revision history, and edge caches are purged. `base_version` must be the version that was opened; if the file changed in the meantime the save is rejected with `conflict`.",
+        "security": [
+          {
+            "bearerAuth": [
+              "files:update",
+              "files:upload"
+            ]
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "base_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "content",
+                  "base_version"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "content": "string",
+                "base_version": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated, invalid_api_key, api_key_revoked, api_key_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "The supplied API key is invalid.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_revoked": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_revoked",
+                        "message": "The supplied API key has been revoked.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_expired": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_expired",
+                        "message": "The supplied API key has expired.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: insufficient_scope, forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "insufficient_scope": {
+                    "value": {
+                      "error": {
+                        "code": "insufficient_scope",
+                        "message": "The API key does not have the required scope.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: file_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_found",
+                        "message": "The requested file could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: file_not_ready, conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_ready": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_ready",
+                        "message": "The file is not available yet.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error: quota_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "The upload would exceed the storage quota.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "any",
+        "x-required-permissions": [
+          "files.edit",
+          "files.upload"
+        ],
+        "x-required-scopes": [
+          "files:update",
+          "files:upload"
+        ],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X PUT \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"content\":\"string\",\"base_version\":1}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text', {\n  method: 'PUT',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"content\": \"string\",\n    \"base_version\": 1\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text', {\n  method: 'PUT',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"content\": \"string\",\n    \"base_version\": 1\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.put(\n    \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/text\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"content\": \"string\",\n        \"base_version\": 1\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
     "/api/v1/webhooks": {
       "get": {
         "operationId": "get_api_v1_webhooks",

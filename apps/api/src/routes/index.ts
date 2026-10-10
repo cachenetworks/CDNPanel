@@ -15,6 +15,7 @@ import { securityRoutes } from './security.js';
 import { settingsRoutes } from './settings.js';
 import { storageRoutes } from './storage.js';
 import { nodeRoutes } from './nodes.js';
+import { editorRoutes } from './editor.js';
 import { webhookRoutes } from './webhooks.js';
 import { deliveryRoutes } from './delivery.js';
 import { zoneRoutes } from './zones.js';
@@ -49,6 +50,7 @@ export const ALL_ROUTES = [
   ...settingsRoutes,
   ...storageRoutes,
   ...nodeRoutes,
+  ...editorRoutes,
   ...webhookRoutes,
   ...zoneRoutes,
   ...cacheRoutes,

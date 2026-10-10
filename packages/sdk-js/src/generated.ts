@@ -188,6 +188,22 @@ export class CdnClient extends CdnCore {
   }
 
   /**
+   * Open a text file for editing — Returns the content of a text file (UTF-8, up to 2 MB) together with its current `version`, which must be sent back when saving.
+   * `GET /api/v1/files/{id}/text` · scopes: files:read
+   */
+  openATextFileForEditing<T = any>(id: string, options: { signal?: AbortSignal } = {}): Promise<T> {
+    return this.request<T>(`/api/v1/files/${encodeURIComponent(id)}/text`, { method: 'GET', signal: options.signal } as RequestOptions);
+  }
+
+  /**
+   * Save an edited text file — Saves new text content as a new revision: the file keeps its id and URLs, the previous content stays in the revision history, and edge caches are purged. `base_version` must be the version that was opened; if the file changed in the meantime the save is rejected with `conflict`.
+   * `PUT /api/v1/files/{id}/text` · scopes: files:update, files:upload
+   */
+  saveAnEditedTextFile<T = any>(id: string, options: { body?: Record<string, unknown>; signal?: AbortSignal } = {}): Promise<T> {
+    return this.request<T>(`/api/v1/files/${encodeURIComponent(id)}/text`, { method: 'PUT', signal: options.signal, body: options.body } as RequestOptions);
+  }
+
+  /**
    * List folders — Lists the direct children of `parent_id` ("root" by default). Pass `all=true` to get every accessible folder (flat, ordered by path).
    * `GET /api/v1/folders` · scopes: folders:read
    */
@@ -654,6 +670,18 @@ export const OPERATIONS = [
     "name": "moveAFile",
     "method": "POST",
     "path": "/api/v1/files/{id}/move",
+    "tag": "Files"
+  },
+  {
+    "name": "openATextFileForEditing",
+    "method": "GET",
+    "path": "/api/v1/files/{id}/text",
+    "tag": "Files"
+  },
+  {
+    "name": "saveAnEditedTextFile",
+    "method": "PUT",
+    "path": "/api/v1/files/{id}/text",
     "tag": "Files"
   },
   {

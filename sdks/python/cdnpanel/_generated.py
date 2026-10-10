@@ -105,6 +105,14 @@ class CdnClient(CdnCore):
         """Move a file (POST /api/v1/files/{id}/move)."""
         return self._request("POST", f"/api/v1/files/{_q(id)}/move", body=body)
 
+    def open_a_text_file_for_editing(self, id: str) -> Any:
+        """Open a text file for editing (GET /api/v1/files/{id}/text)."""
+        return self._request("GET", f"/api/v1/files/{_q(id)}/text")
+
+    def save_an_edited_text_file(self, id: str, body: Optional[Dict[str, Any]] = None) -> Any:
+        """Save an edited text file (PUT /api/v1/files/{id}/text)."""
+        return self._request("PUT", f"/api/v1/files/{_q(id)}/text", body=body)
+
     def list_folders(self, query: Optional[Dict[str, Any]] = None) -> Any:
         """List folders (GET /api/v1/folders)."""
         return self._request("GET", f"/api/v1/folders", query=query)

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Download, Link2, Trash2, X, FolderInput, CopyPlus } from 'lucide-react';
+import { Download, Link2, Trash2, X, FolderInput, CopyPlus, FilePen } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -13,6 +13,7 @@ import { Field, Input, NativeSelect, Switch, Label } from '../ui/form';
 import { Badge, CopyButton, KeyValue, Skeleton } from '../ui/misc';
 import { useConfirm } from '../confirm';
 import { FolderPickerDialog } from './folder-picker';
+import { TextEditorDialog } from './text-editor';
 import { CacheSection, ImageSection, MediaSection, SharesSection, VersionsSection } from './file-extras';
 
 export function statusTone(s: FileDTO['status']) {
@@ -45,6 +46,7 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
   const [cacheControl, setCacheControl] = React.useState('');
   const [moveOpen, setMoveOpen] = React.useState(false);
   const [copyOpen, setCopyOpen] = React.useState(false);
+  const [editorOpen, setEditorOpen] = React.useState(false);
   const [expiresIn, setExpiresIn] = React.useState('3600');
   const [signed, setSigned] = React.useState<{ url: string; expires_at: string } | null>(null);
 
@@ -95,6 +97,11 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {f.editable && f.status === 'READY' && editable && can('files.upload') && (
+                    <Button size="sm" onClick={() => setEditorOpen(true)}>
+                      <FilePen /> Edit
+                    </Button>
+                  )}
                   {can('files.download') && (
                     <Button size="sm" variant="secondary" asChild>
                       <a href={`/api/v1/files/${f.id}/download`}>
@@ -309,6 +316,7 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                   }
                 }}
               />
+              <TextEditorDialog fileId={editorOpen ? f.id : null} onClose={() => setEditorOpen(false)} />
             </>
           )}
         </DialogPrimitive.Content>

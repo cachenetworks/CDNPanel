@@ -122,18 +122,19 @@ describe('storage nodes and RAID pools', () => {
     expect(local.statusCode).toBe(422);
   });
 
-  it('counts every node in the combined storage figures', async () => {
+  it('lists nodes outside a pool without counting them as usable space', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/storage', headers: staff });
     expect(res.statusCode, res.body).toBe(200);
     const cluster = res.json().cluster;
-    const names = cluster.servers.map((s: { name: string }) => s.name);
-    expect(names).toEqual(expect.arrayContaining(['node-0', 'node-1', 'node-2']));
-    const nodeTotal = cluster.servers.filter((s: { role: string }) => s.role === 'node').reduce((a: number, s: { total: number }) => a + s.total, 0);
-    expect(cluster.total).toBeGreaterThanOrEqual(nodeTotal);
+    const nodes = cluster.servers.filter((s: { role: string }) => s.role === 'node');
+    expect(nodes.map((s: { name: string }) => s.name)).toEqual(expect.arrayContaining(['node-0', 'node-1', 'node-2']));
+    expect(nodes.every((s: { counted: boolean }) => !s.counted)).toBe(true);
+    const counted = cluster.servers.filter((s: { counted: boolean }) => s.counted);
+    expect(cluster.total).toBe(counted.reduce((a: number, s: { total: number }) => a + s.total, 0));
+    expect(cluster.unassigned_nodes).toBe(nodes.length);
     const overview = await app.inject({ method: 'GET', url: '/api/v1/dashboard/overview', headers: staff });
     expect(overview.statusCode, overview.body).toBe(200);
     expect(overview.json().stats.cluster_total).toBe(cluster.total);
-    expect(overview.json().stats.cluster_servers).toBe(cluster.servers.length);
   });
 
   it('counts cloud buckets by their quota and measured usage', async () => {
@@ -181,6 +182,12 @@ describe('storage nodes and RAID pools', () => {
     expect(pool.usable_bytes).toBeGreaterThan(0);
     expect(pool.members.map((m: { node: { id: string } }) => m.node.id)).toEqual(nodeIds);
 
+    const totals = await clusterStorage();
+    const entry = totals.servers.find((x) => x.role === 'pool' && x.name === 'raid5-pool')!;
+    expect(entry).toMatchObject({ counted: true, level: 'RAID5', nodes: ['node-0', 'node-1', 'node-2'] });
+    expect(entry.total).toBe(pool.usable_bytes);
+    expect(entry.raw_total).toBeGreaterThan(entry.total!);
+    expect(totals.servers.filter((x) => x.role === 'node').map((x) => x.name)).not.toEqual(expect.arrayContaining(['node-0']));
     const taken = await app.inject({ method: 'POST', url: '/api/v1/storage/pools', headers: staff, payload: { name: 'again', level: 'RAID1', node_ids: nodeIds.slice(0, 2) } });
     expect(taken.statusCode).toBe(409);
 

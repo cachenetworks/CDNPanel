@@ -13,6 +13,8 @@ export interface FileDTO {
   folder_id: string | null;
   folder_path?: string | null;
   mime_type: string;
+  /** Text the browser editor can open. */
+  editable?: boolean;
   extension: string;
   size: number;
   sha256: string | null;

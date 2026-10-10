@@ -1,3 +1,4 @@
+import { isEditable } from './textFiles.js';
 import type { ApiKey, ApiKeyScope, File, Folder, StorageProvider, User } from '@cdn/database';
 import { env } from '../config/env.js';
 
@@ -30,6 +31,8 @@ export function serializeFile(f: FileWithRelations) {
     folder_id: f.folderId,
     folder_path: f.folder ? f.folder.path : f.folderId ? undefined : '/',
     mime_type: f.mimeType,
+    // Text the browser editor can open (type and size; content is validated when opened).
+    editable: isEditable(f),
     extension: f.extension,
     size: n(f.size),
     sha256: f.sha256,
