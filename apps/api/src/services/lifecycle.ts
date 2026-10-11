@@ -8,25 +8,52 @@ import { getZones } from '../lib/zones.js';
 import { deleteFiles, deleteUnreferencedObjects, trashFiles } from './files.js';
 import { openFileStream } from './replication.js';
 import { autoPurgeFiles } from './purge.js';
+import { AppError } from '@cdn/shared';
+import { createHash } from 'node:crypto';
+import { providerSpace } from './storageCapacity.js';
 
 const log = baseLogger.child({ service: 'lifecycle' });
 const BATCH = 500;
 
 /** Copies a file's current object to another provider and repoints the record. */
 export async function moveFileStorage(file: File, targetProviderId: string, storageClass?: string): Promise<void> {
+  if (file.status !== 'READY' || file.deletedAt) throw new AppError('file_not_ready');
   if (file.storageProviderId === targetProviderId) return;
   const prisma = getPrisma();
-  const { driver: target } = await driverForId(targetProviderId);
-  const existing = await target.head(file.storageKey).catch(() => null);
-  if (!existing || existing.size !== Number(file.size)) {
+  const { driver: target, provider } = await driverForId(targetProviderId);
+  if (!provider.enabled) throw new AppError('validation_failed', 'The destination storage provider is disabled.');
+  const existing = await target.head(file.storageKey);
+  if (existing) {
+    if (existing.size !== Number(file.size)) throw new AppError('storage_error', 'The destination object has a different size.');
+    if (!file.sha256) throw new AppError('storage_error', 'Cannot verify an existing destination object without a checksum.');
+  } else {
+    const used = await prisma.file.aggregate({ where: { storageProviderId: targetProviderId }, _sum: { size: true } });
+    const space = await providerSpace(provider, Math.max(Number(used._sum.size ?? 0), Number(provider.bucketUsedBytes ?? 0)));
+    if (space.available !== null && space.available < Number(file.size)) throw new AppError('quota_exceeded', 'The destination has insufficient space.');
     const { stream } = await openFileStream(file, null);
-    await target.put(file.storageKey, stream, { contentType: 'application/octet-stream', size: Number(file.size) });
-    const info = await target.head(file.storageKey);
-    if (!info || info.size !== Number(file.size)) throw new Error('copy verification failed');
+    try {
+      await target.put(file.storageKey, stream, { contentType: file.mimeType, size: Number(file.size) });
+    } finally {
+      stream.destroy();
+    }
   }
-  await prisma.file.update({ where: { id: file.id }, data: { storageProviderId: targetProviderId, ...(storageClass ? { storageClass } : {}) } });
-  // A replica on the target provider is now the primary copy.
-  await prisma.fileReplica.deleteMany({ where: { fileId: file.id, storageProviderId: targetProviderId } });
+  const info = await target.head(file.storageKey);
+  if (!info || info.size !== Number(file.size)) throw new AppError('storage_error', 'Copy size verification failed.');
+  if (file.sha256) {
+    const hash = createHash('sha256');
+    const stream = await target.get(file.storageKey);
+    for await (const chunk of stream) hash.update(chunk);
+    if (hash.digest('hex') !== file.sha256) throw new AppError('checksum_mismatch', 'Destination checksum verification failed.');
+  }
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.file.updateMany({
+      where: { id: file.id, storageProviderId: file.storageProviderId, storageKey: file.storageKey, version: file.version, status: 'READY', deletedAt: null },
+      data: { storageProviderId: targetProviderId, ...(storageClass ? { storageClass } : {}) },
+    });
+    if (result.count !== 1) throw new AppError('conflict', 'The file changed during the move. Refresh and try again.');
+    // A replica on the target provider is now the primary copy.
+    await tx.fileReplica.deleteMany({ where: { fileId: file.id, storageProviderId: targetProviderId } });
+  });
   await deleteUnreferencedObjects([{ providerId: file.storageProviderId, key: file.storageKey }]);
 }
 

@@ -18,6 +18,7 @@ import { FileIcon, FolderIcon } from '@/components/files/file-icon';
 import { FileDetails, VisibilityBadge, statusTone } from '@/components/files/file-details';
 import { FolderDialog } from '@/components/files/folder-dialog';
 import { FolderPickerDialog } from '@/components/files/folder-picker';
+import { StorageMoveDialog } from '@/components/files/storage-move-dialog';
 import { useConfirm } from '@/components/confirm';
 import { useUploads } from '@/components/uploads/upload-manager';
 import { Dropzone } from '@/components/uploads/dropzone';
@@ -64,6 +65,7 @@ function FilesBrowser() {
   const [folderDialog, setFolderDialog] = React.useState<{ open: boolean; folder?: FolderDTO | null }>({ open: false });
   const [moveFolder, setMoveFolder] = React.useState<FolderDTO | null>(null);
   const [bulkMove, setBulkMove] = React.useState(false);
+  const [storageMoveOpen, setStorageMoveOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [dragging, setDragging] = React.useState(false);
   const q = useDebounced(search);
@@ -386,6 +388,9 @@ function FilesBrowser() {
               <FolderInput /> Move
             </Button>
           )}
+          {can('files.edit') && can('storage.manage') && (
+            <Button size="sm" variant="secondary" onClick={() => setStorageMoveOpen(true)}>Move storage</Button>
+          )}
           {can('files.delete') && (
             <Button size="sm" variant="destructive" onClick={bulkDelete}>
               <Trash2 /> Delete
@@ -523,6 +528,7 @@ function FilesBrowser() {
       </Panel>
 
       <FileDetails fileId={openFile} onClose={() => setFileParam(null)} />
+      <StorageMoveDialog open={storageMoveOpen} onOpenChange={setStorageMoveOpen} fileIds={[...selected]} />
       <FolderDialog open={folderDialog.open} onOpenChange={(o) => setFolderDialog((s) => ({ ...s, open: o }))} folder={folderDialog.folder} parentId={folderId} />
       <FolderPickerDialog
         open={Boolean(moveFolder)}

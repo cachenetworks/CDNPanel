@@ -15,6 +15,7 @@ import { autoPurgeFiles } from '../services/purge.js';
 import { zoneForFolder } from '../lib/zones.js';
 import { handleMultipartUpload } from '../services/multipart.js';
 import { sendFile } from '../services/delivery.js';
+import { moveFileStorage } from '../services/lifecycle.js';
 
 const fileId = z.object({ id: z.string().min(1).max(64) });
 const folderRef = z
@@ -92,6 +93,28 @@ const listQuery = pageQuery.extend({
 });
 
 export const fileRoutes: RouteDef<any, any, any>[] = [
+  defineRoute({
+    method: 'POST',
+    url: '/api/v1/files/:id/move-storage',
+    tag: 'Files',
+    summary: 'Move a file to another storage server, pool or cloud provider',
+    description: 'Moves the current content while preserving file URLs. Previous revisions, derived media and configured replicas retain their own storage locations.',
+    auth: 'session',
+    permission: ['files.edit', 'storage.manage'],
+    params: fileId,
+    body: z.object({ storage_provider_id: z.string().refine((id) => isValidId('storageProvider', id), 'must be a storage provider id') }).strict(),
+    responses: { 200: { description: 'Moved file', example: FILE_EXAMPLE } },
+    errors: ['file_not_found', 'file_not_ready', 'storage_provider_not_found', 'quota_exceeded', 'storage_error', 'conflict'],
+    async handler({ req, params, body }) {
+      const file = await requireFile(req, params.id);
+      await moveFileStorage(file, body.storage_provider_id, 'standard');
+      const updated = await getPrisma().file.findUniqueOrThrow({ where: { id: file.id }, include: FILE_INCLUDE });
+      await audit(actorOf(req), 'FILE_MOVE', { type: 'file', id: file.id }, { from_storage_provider: file.storageProviderId, to_storage_provider: body.storage_provider_id });
+      const serialized = serializeFile(updated);
+      await emitWebhookEvent('file.updated', { file: serialized });
+      return serialized;
+    },
+  }),
   defineRoute({
     method: 'GET',
     url: '/api/v1/files',

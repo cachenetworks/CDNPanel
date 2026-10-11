@@ -14,6 +14,7 @@ import { Badge, CopyButton, KeyValue, Skeleton } from '../ui/misc';
 import { useConfirm } from '../confirm';
 import { FolderPickerDialog } from './folder-picker';
 import { TextEditorDialog } from './text-editor';
+import { StorageMoveDialog } from './storage-move-dialog';
 import { CacheSection, ImageSection, MediaSection, SharesSection, VersionsSection } from './file-extras';
 
 export function statusTone(s: FileDTO['status']) {
@@ -45,6 +46,7 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
   const [name, setName] = React.useState('');
   const [cacheControl, setCacheControl] = React.useState('');
   const [moveOpen, setMoveOpen] = React.useState(false);
+  const [storageMoveOpen, setStorageMoveOpen] = React.useState(false);
   const [copyOpen, setCopyOpen] = React.useState(false);
   const [editorOpen, setEditorOpen] = React.useState(false);
   const [expiresIn, setExpiresIn] = React.useState('3600');
@@ -124,6 +126,9 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
                     <Button size="sm" variant="secondary" onClick={() => setMoveOpen(true)}>
                       <FolderInput /> Move
                     </Button>
+                  )}
+                  {editable && can('storage.manage') && f.status === 'READY' && (
+                    <Button size="sm" variant="secondary" onClick={() => setStorageMoveOpen(true)}>Move storage</Button>
                   )}
                   {editable && can('files.upload') && (
                     <Button size="sm" variant="secondary" onClick={() => setCopyOpen(true)}>
@@ -286,6 +291,7 @@ export function FileDetails({ fileId, onClose }: { fileId: string | null; onClos
           </div>
           {f && (
             <>
+              <StorageMoveDialog open={storageMoveOpen} onOpenChange={setStorageMoveOpen} fileIds={[f.id]} currentProviderId={f.storage_provider.id} />
               <FolderPickerDialog
                 open={moveOpen}
                 onOpenChange={setMoveOpen}
