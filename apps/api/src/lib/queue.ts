@@ -10,6 +10,7 @@ export const QUEUE_NAMES = {
   replication: 'replication',
   edge: 'edge',
   pools: 'pools',
+  storageMoves: 'storage-moves',
 } as const;
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 export const ALL_QUEUES = Object.values(QUEUE_NAMES) as QueueName[];
@@ -30,6 +31,13 @@ export interface MediaJob {
 export interface ReplicationJob {
   fileId: string;
   providerId: string;
+}
+export interface StorageMoveJob {
+  fileIds: string[];
+  sourceProviderIds: string[];
+  targetProviderId: string;
+  targetName: string;
+  userId: string;
 }
 /** Rebuild / scrub of a RAID pool (`verify` also checks every shard's presence and length). */
 export interface PoolJob {

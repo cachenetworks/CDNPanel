@@ -13,6 +13,7 @@ import {
   type MediaJob,
   type PoolJob,
   type ReplicationJob,
+  type StorageMoveJob,
   type WebhookJob,
 } from '../lib/queue.js';
 import { stopTelemetry } from '../lib/telemetry.js';
@@ -29,6 +30,7 @@ import { evaluateQuotaAlerts } from '../services/usage.js';
 import { checkNodes, runPoolRepair, scrubPools } from '../services/storageNodes.js';
 import { getSettings } from '../lib/settings.js';
 import { getPrisma } from '@cdn/database';
+import { runStorageMove } from '../services/storageMoves.js';
 
 const log = baseLogger.child({ service: 'cdn-worker' });
 // Per-minute completed / failed counts, shown on the Operations page.
@@ -84,6 +86,10 @@ async function main() {
     { connection: bullConnection(), concurrency: 4, lockDuration: 300_000, metrics },
   );
   replicationWorker.on('failed', (job, err) => log.warn({ err: err.message, file_id: job?.data.fileId, provider_id: job?.data.providerId }, 'replication failed'));
+  const storageMoveWorker = new Worker<StorageMoveJob>(QUEUE_NAMES.storageMoves, runStorageMove, {
+    connection: bullConnection(), concurrency: 1, lockDuration: 600_000, metrics,
+  });
+  storageMoveWorker.on('failed', (job, err) => log.error({ err, job_id: job?.id }, 'storage move failed'));
 
   // RAID pool rebuilds can take hours: own queue, one at a time, so other jobs never wait behind them.
   const poolWorker = new Worker<PoolJob>(QUEUE_NAMES.pools, async (job) => runPoolRepair(job.data.poolId, job.data), {
@@ -172,7 +178,7 @@ async function main() {
   const shutdown = async () => {
     log.info('worker shutting down');
     clearInterval(heartbeat);
-    await Promise.allSettled([fileWorker.close(), webhookWorker.close(), mediaWorker.close(), replicationWorker.close(), poolWorker.close(), edgeWorker.close(), maintenanceWorker.close()]);
+    await Promise.allSettled([fileWorker.close(), webhookWorker.close(), mediaWorker.close(), replicationWorker.close(), storageMoveWorker.close(), poolWorker.close(), edgeWorker.close(), maintenanceWorker.close()]);
     await closeQueues();
     await closeRedis();
     await disconnectPrisma();

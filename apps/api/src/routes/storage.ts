@@ -5,7 +5,7 @@ import { getPrisma } from '@cdn/database';
 import { createStorageDriver } from '@cdn/storage';
 import { AppError, isValidId, newId } from '@cdn/shared';
 import { defineRoute, type RouteDef } from '../http/route.js';
-import { actorOf } from '../http/context.js';
+import { actorOf, type SessionAuth } from '../http/context.js';
 import { audit } from '../lib/audit.js';
 import { serializeFile, FILE_INCLUDE } from '../lib/serialize.js';
 import {
@@ -21,6 +21,8 @@ import {
 import { getSettings } from '../lib/settings.js';
 import { clusterStorage, providerSpace, smallestKnownLimit } from '../services/storageCapacity.js';
 import { measureBucketUsage } from '../services/replication.js';
+import { getQueue, QUEUE_NAMES, type StorageMoveJob } from '../lib/queue.js';
+import { localMoveScope, initialMoveProgress } from '../services/storageMoves.js';
 
 const providerParams = z.object({ id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') });
 
@@ -112,6 +114,62 @@ async function providerSummaries() {
 }
 
 export const storageRoutes: RouteDef<any, any, any>[] = [
+  defineRoute({
+    method: 'GET', url: '/api/v1/storage/local-move-preview', tag: 'Storage',
+    summary: 'Preview moving all local files', auth: 'session', permission: ['files.edit', 'storage.manage'],
+    responses: { 200: { description: 'Eligible local file count and bytes' } },
+    async handler({ req }) {
+      const scope = await localMoveScope(req);
+      const [ready, skipped] = await Promise.all([
+        getPrisma().file.aggregate({ where: { ...scope, status: 'READY' }, _sum: { size: true }, _count: { _all: true } }),
+        getPrisma().file.count({ where: { ...scope, status: { not: 'READY' } } }),
+      ]);
+      return { count: ready._count._all, bytes: Number(ready._sum.size ?? 0), not_ready: skipped };
+    },
+  }),
+  defineRoute({
+    method: 'POST', url: '/api/v1/storage/local-moves', tag: 'Storage',
+    summary: 'Move all local files in the background',
+    description: 'Snapshots all accessible ready files on LOCAL providers and moves them sequentially to the selected cloud provider or pool. Existing URLs are preserved. Revisions, derived media, recycle-bin files and future uploads are excluded.',
+    auth: 'session', permission: ['files.edit', 'storage.manage'],
+    body: z.object({ storage_provider_id: z.string().refine((v) => isValidId('storageProvider', v), 'invalid provider id') }).strict(),
+    responses: { 202: { description: 'Background move queued' } },
+    errors: ['validation_failed', 'storage_provider_not_found', 'quota_exceeded'],
+    async handler({ req, body, auth, reply }) {
+      const prisma = getPrisma();
+      const target = await prisma.storageProvider.findUnique({ where: { id: body.storage_provider_id } });
+      if (!target) throw new AppError('storage_provider_not_found');
+      if (!target.enabled || target.kind === 'LOCAL') throw new AppError('validation_failed', 'Select an enabled cloud provider or storage pool.');
+      const scope = await localMoveScope(req);
+      const files = await prisma.file.findMany({ where: { ...scope, status: 'READY' }, select: { id: true, size: true, storageProviderId: true }, orderBy: { id: 'asc' } });
+      if (!files.length) throw new AppError('validation_failed', 'There are no ready local files to move.');
+      const bytes = files.reduce((sum, f) => sum + Number(f.size), 0);
+      const used = await prisma.file.aggregate({ where: { storageProviderId: target.id }, _sum: { size: true } });
+      const space = await providerSpace(target, Math.max(Number(used._sum.size ?? 0), Number(target.bucketUsedBytes ?? 0)));
+      if (space.available !== null && space.available < bytes) throw new AppError('quota_exceeded', 'The destination does not have enough space for all local files.');
+      const job = await getQueue(QUEUE_NAMES.storageMoves).add('move-local', {
+        fileIds: files.map((f) => f.id), sourceProviderIds: [...new Set(files.map((f) => f.storageProviderId))],
+        targetProviderId: target.id, targetName: target.name, userId: (auth as SessionAuth).user.id,
+      } satisfies StorageMoveJob, { attempts: 3, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: 100, removeOnFail: 100 });
+      await audit(actorOf(req), 'FILE_MOVE', { type: 'storage_provider', id: target.id }, { job_id: job.id, local_files: files.length, bytes });
+      reply.code(202);
+      return { id: job.id, total: files.length, bytes };
+    },
+  }),
+  defineRoute({
+    method: 'GET', url: '/api/v1/storage/local-moves', tag: 'Storage',
+    summary: 'List recent local file moves and progress', auth: 'session', permission: ['files.edit', 'storage.manage'],
+    responses: { 200: { description: 'Recent background moves' } },
+    async handler({ auth }) {
+      const jobs = await getQueue(QUEUE_NAMES.storageMoves).getJobs(['active', 'wait', 'delayed', 'completed', 'failed', 'paused'], 0, 99);
+      const visible = jobs.filter((job) => job.data.userId === (auth as SessionAuth).user.id).sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
+      return { data: await Promise.all(visible.map(async (job) => ({
+        id: job.id, state: await job.getState(), target_name: job.data.targetName,
+        created_at: new Date(job.timestamp).toISOString(), error: job.failedReason || null,
+        progress: typeof job.progress === 'object' ? job.progress : initialMoveProgress(job.data.fileIds.length),
+      }))) };
+    },
+  }),
   defineRoute({
     method: 'GET',
     url: '/api/v1/storage',

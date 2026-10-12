@@ -16,6 +16,7 @@ import { Table, TD, TH, THead, TR } from '@/components/ui/table';
 import { RankedBars } from '@/components/charts';
 import { useConfirm, useStepUp } from '@/components/confirm';
 import { ListInput, StatusDot, healthTone } from '@/components/ui/stat';
+import { LocalStorageMove } from '@/components/files/local-storage-move';
 
 interface Provider {
   id: string;
@@ -322,6 +323,7 @@ export default function StoragePage() {
         }
       />
       {q.isError && <ErrorState error={q.error} onRetry={() => q.refetch()} />}
+      {manage && can('files.edit') && <LocalStorageMove />}
       {!d ? (
         <Skeleton className="h-64" />
       ) : (
