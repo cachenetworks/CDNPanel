@@ -2508,6 +2508,308 @@
         ]
       }
     },
+    "/api/v1/files/{id}/move-storage": {
+      "post": {
+        "operationId": "post_api_v1_files_id_move_storage",
+        "tags": [
+          "Files"
+        ],
+        "summary": "Move a file to another storage server, pool or cloud provider",
+        "description": "Moves the current content while preserving file URLs. Previous revisions, derived media and configured replicas retain their own storage locations.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "storage_provider_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "storage_provider_id"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "storage_provider_id": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moved file",
+            "content": {
+              "application/json": {
+                "example": {
+                  "id": "file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                  "object": "file",
+                  "name": "image.png",
+                  "slug": "image.png",
+                  "folder_id": "fld_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                  "folder_path": "/images",
+                  "mime_type": "image/png",
+                  "extension": "png",
+                  "size": 384920,
+                  "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+                  "visibility": "PUBLIC",
+                  "status": "READY",
+                  "status_reason": null,
+                  "cache_control": null,
+                  "force_download": false,
+                  "width": 1200,
+                  "height": 630,
+                  "duration_seconds": null,
+                  "metadata": {},
+                  "storage_provider": {
+                    "id": "stp_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                    "name": "Primary (environment)",
+                    "kind": "LOCAL"
+                  },
+                  "uploaded_by": null,
+                  "uploaded_by_api_key": {
+                    "id": "key_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                    "name": "CI uploader",
+                    "prefix": "cdn_live_a82f"
+                  },
+                  "download_count": 42,
+                  "bandwidth_bytes": 16166640,
+                  "last_accessed_at": "2026-01-01T12:00:00.000Z",
+                  "scanned_at": null,
+                  "created_at": "2026-01-01T10:00:00.000Z",
+                  "updated_at": "2026-01-01T10:00:00.000Z",
+                  "url": "https://cdn.example.com/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                  "api_url": "https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6",
+                  "download_url": "https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/download",
+                  "path_url": "https://cdn.example.com/p/images/image.png"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: file_not_found, storage_provider_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_found",
+                        "message": "The requested file could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "storage_provider_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "storage_provider_not_found",
+                        "message": "The requested storage provider could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error: file_not_ready, conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "file_not_ready": {
+                    "value": {
+                      "error": {
+                        "code": "file_not_ready",
+                        "message": "The file is not available yet.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "conflict": {
+                    "value": {
+                      "error": {
+                        "code": "conflict",
+                        "message": "The request conflicts with the current state of the resource.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error: quota_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "The upload would exceed the storage quota.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error: storage_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "storage_error": {
+                    "value": {
+                      "error": {
+                        "code": "storage_error",
+                        "message": "The storage backend returned an error.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "files.edit",
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/move-storage\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"storage_provider_id\":\"string\"}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/move-storage', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"storage_provider_id\": \"string\"\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/move-storage', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"storage_provider_id\": \"string\"\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/files/file_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/move-storage\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"storage_provider_id\": \"string\"\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
     "/api/v1/files": {
       "get": {
         "operationId": "get_api_v1_files",
@@ -15448,6 +15750,455 @@
         ]
       }
     },
+    "/api/v1/storage/local-move-preview": {
+      "get": {
+        "operationId": "get_api_v1_storage_local_move_preview",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Preview moving all local files",
+        "description": "Preview moving all local files",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Eligible local file count and bytes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "files.edit",
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/storage/local-move-preview\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-move-preview', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-move-preview', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/storage/local-move-preview\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/local-moves": {
+      "post": {
+        "operationId": "post_api_v1_storage_local_moves",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Move all local files in the background",
+        "description": "Snapshots all accessible ready files on LOCAL providers and moves them sequentially to the selected cloud provider or pool. Existing URLs are preserved. Revisions, derived media, recycle-bin files and future uploads are excluded.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "storage_provider_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "storage_provider_id"
+                ],
+                "additionalProperties": false
+              },
+              "example": {
+                "storage_provider_id": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Background move queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden, csrf_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "csrf_failed": {
+                    "value": {
+                      "error": {
+                        "code": "csrf_failed",
+                        "message": "CSRF validation failed.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: storage_provider_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "storage_provider_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "storage_provider_not_found",
+                        "message": "The requested storage provider could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Error: quota_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "quota_exceeded": {
+                    "value": {
+                      "error": {
+                        "code": "quota_exceeded",
+                        "message": "The upload would exceed the storage quota.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "files.edit",
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/storage/local-moves\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"storage_provider_id\":\"string\"}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-moves', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"storage_provider_id\": \"string\"\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-moves', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"storage_provider_id\": \"string\"\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/storage/local-moves\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"storage_provider_id\": \"string\"\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      },
+      "get": {
+        "operationId": "get_api_v1_storage_local_moves",
+        "tags": [
+          "Storage"
+        ],
+        "summary": "List recent local file moves and progress",
+        "description": "List recent local file moves and progress",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Recent background moves",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "session",
+        "x-required-permissions": [
+          "files.edit",
+          "storage.manage"
+        ],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/api/v1/storage/local-moves\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-moves', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}` },\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/storage/local-moves', {\n  method: 'GET',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}` },\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/api/v1/storage/local-moves\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
     "/api/v1/storage": {
       "get": {
         "operationId": "get_api_v1_storage",
@@ -28201,7 +28952,7 @@
           "Shares"
         ],
         "summary": "Share landing page",
-        "description": "Human-facing page for a share link: shows the file, asks for the password / email when required and offers the download.",
+        "description": "Human-facing page for a share link: shows the file (or the files of a shared folder), asks for the password / email when required and offers the download.",
         "security": [],
         "parameters": [
           {
@@ -28436,6 +29187,180 @@
             "lang": "python",
             "label": "Python",
             "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/s/{token}/download\",\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
+    "/s/{token}/files/{fileId}": {
+      "get": {
+        "operationId": "get_s_token_files_fileId",
+        "tags": [
+          "Shares"
+        ],
+        "summary": "Download a file through a folder share link",
+        "description": "Streams one file of a shared folder (or its sub-folders) as an attachment. Each file download counts towards the download limit.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: share_password_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "share_password_required": {
+                    "value": {
+                      "error": {
+                        "code": "share_password_required",
+                        "message": "This share link is password protected.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: access_denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "access_denied": {
+                    "value": {
+                      "error": {
+                        "code": "access_denied",
+                        "message": "Access to this resource is not permitted from your location or referrer.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: share_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "share_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "share_not_found",
+                        "message": "This share link does not exist or has been revoked.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Error: share_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "share_expired": {
+                    "value": {
+                      "error": {
+                        "code": "share_expired",
+                        "message": "This share link has expired.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "public",
+        "x-required-permissions": [],
+        "x-required-scopes": [],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X GET \"https://cdn.example.com/s/{token}/files/{fileId}\""
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/s/{token}/files/{fileId}', {\n  method: 'GET',\n  headers: {},\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/s/{token}/files/{fileId}', {\n  method: 'GET',\n  headers: {},\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.get(\n    \"https://cdn.example.com/s/{token}/files/{fileId}\",\n)\nres.raise_for_status()\nprint(res.json())"
           }
         ]
       }
@@ -28756,6 +29681,301 @@
         ]
       }
     },
+    "/api/v1/folders/{id}/shares": {
+      "post": {
+        "operationId": "post_api_v1_folders_id_shares",
+        "tags": [
+          "Shares"
+        ],
+        "summary": "Share a folder",
+        "description": "Creates a share URL for a whole folder: the landing page lists every ready file in the folder and its sub-folders, each downloadable on its own. Sub-folders restricted to staff roles are not exposed. Same options as file shares except one-time use; the download limit counts file downloads. The URL is only returned once.",
+        "security": [
+          {
+            "bearerAuth": [
+              "shares:write"
+            ]
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "nullable": true
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "nullable": true
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "max_downloads": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000,
+                    "nullable": true
+                  },
+                  "allowed_ips": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 100
+                  },
+                  "allowed_countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{2}$"
+                    },
+                    "maxItems": 250
+                  },
+                  "require_email": {
+                    "type": "boolean"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 256
+                  },
+                  "one_time": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "expires_in": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 31536000
+                  }
+                },
+                "additionalProperties": false
+              },
+              "example": {
+                "title": "string",
+                "message": "string",
+                "expires_at": "2026-12-31T23:59:59.000Z",
+                "max_downloads": 1,
+                "allowed_ips": [
+                  "string"
+                ],
+                "allowed_countries": [
+                  "string"
+                ],
+                "require_email": false,
+                "password": "string",
+                "one_time": false,
+                "expires_in": 60
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Share link (url shown once)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error: unauthenticated, invalid_api_key, api_key_revoked, api_key_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthenticated": {
+                    "value": {
+                      "error": {
+                        "code": "unauthenticated",
+                        "message": "Authentication is required.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "invalid_api_key": {
+                    "value": {
+                      "error": {
+                        "code": "invalid_api_key",
+                        "message": "The supplied API key is invalid.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_revoked": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_revoked",
+                        "message": "The supplied API key has been revoked.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "api_key_expired": {
+                    "value": {
+                      "error": {
+                        "code": "api_key_expired",
+                        "message": "The supplied API key has expired.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: insufficient_scope, forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "insufficient_scope": {
+                    "value": {
+                      "error": {
+                        "code": "insufficient_scope",
+                        "message": "The API key does not have the required scope.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  },
+                  "forbidden": {
+                    "value": {
+                      "error": {
+                        "code": "forbidden",
+                        "message": "You do not have permission to perform this action.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error: folder_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "folder_not_found": {
+                    "value": {
+                      "error": {
+                        "code": "folder_not_found",
+                        "message": "The requested folder could not be found.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error: validation_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "validation_failed": {
+                    "value": {
+                      "error": {
+                        "code": "validation_failed",
+                        "message": "One or more fields failed validation.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: rate_limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "rate_limited": {
+                    "value": {
+                      "error": {
+                        "code": "rate_limited",
+                        "message": "Too many requests. Please slow down.",
+                        "request_id": "req_01J9Z8Q4X5K3W2V1T0S9R8Q7P6"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-auth-mode": "any",
+        "x-required-permissions": [
+          "shares.manage"
+        ],
+        "x-required-scopes": [
+          "shares:write"
+        ],
+        "x-codeSamples": [
+          {
+            "lang": "shell",
+            "label": "curl",
+            "source": "curl -X POST \"https://cdn.example.com/api/v1/folders/fld_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/shares\" \\\n  -H \"Authorization: Bearer $CDN_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"title\":\"string\",\"message\":\"string\",\"expires_at\":\"2026-12-31T23:59:59.000Z\",\"max_downloads\":1,\"allowed_ips\":[\"string\"],\"allowed_countries\":[\"string\"],\"require_email\":false,\"password\":\"string\",\"one_time\":false,\"expires_in\":60}'"
+          },
+          {
+            "lang": "javascript",
+            "label": "JavaScript",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/folders/fld_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/shares', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"title\": \"string\",\n    \"message\": \"string\",\n    \"expires_at\": \"2026-12-31T23:59:59.000Z\",\n    \"max_downloads\": 1,\n    \"allowed_ips\": [\n      \"string\"\n    ],\n    \"allowed_countries\": [\n      \"string\"\n    ],\n    \"require_email\": false,\n    \"password\": \"string\",\n    \"one_time\": false,\n    \"expires_in\": 60\n  }),\n});\nconst data = await res.json();"
+          },
+          {
+            "lang": "javascript",
+            "label": "Node.js",
+            "source": "const res = await fetch('https://cdn.example.com/api/v1/folders/fld_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/shares', {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.CDN_API_KEY}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    \"title\": \"string\",\n    \"message\": \"string\",\n    \"expires_at\": \"2026-12-31T23:59:59.000Z\",\n    \"max_downloads\": 1,\n    \"allowed_ips\": [\n      \"string\"\n    ],\n    \"allowed_countries\": [\n      \"string\"\n    ],\n    \"require_email\": false,\n    \"password\": \"string\",\n    \"one_time\": false,\n    \"expires_in\": 60\n  }),\n});\nif (!res.ok) {\n  const { error } = await res.json();\n  throw new Error(`${error.code}: ${error.message}`);\n}\nconsole.log(await res.json());"
+          },
+          {
+            "lang": "python",
+            "label": "Python",
+            "source": "import os, requests\n\nres = requests.post(\n    \"https://cdn.example.com/api/v1/folders/fld_01J9Z8Q4X5K3W2V1T0S9R8Q7P6/shares\",\n    headers={\"Authorization\": f\"Bearer {os.environ['CDN_API_KEY']}\"},\n    json={\n        \"title\": \"string\",\n        \"message\": \"string\",\n        \"expires_at\": \"2026-12-31T23:59:59.000Z\",\n        \"max_downloads\": 1,\n        \"allowed_ips\": [\n            \"string\"\n        ],\n        \"allowed_countries\": [\n            \"string\"\n        ],\n        \"require_email\": False,\n        \"password\": \"string\",\n        \"one_time\": False,\n        \"expires_in\": 60\n    },\n)\nres.raise_for_status()\nprint(res.json())"
+          }
+        ]
+      }
+    },
     "/api/v1/shares": {
       "get": {
         "operationId": "get_api_v1_shares",
@@ -28799,6 +30019,21 @@
           },
           {
             "name": "file_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "not": {}
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "name": "folder_id",
             "in": "query",
             "required": false,
             "schema": {
@@ -39139,7 +40374,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           },
@@ -39313,7 +40549,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           },
@@ -39477,7 +40714,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           },
@@ -39673,7 +40911,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           },
@@ -39869,7 +41108,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           }
@@ -40014,7 +41254,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           }
@@ -40192,7 +41433,8 @@
                 "media",
                 "replication",
                 "edge",
-                "pools"
+                "pools",
+                "storage-moves"
               ]
             }
           },

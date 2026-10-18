@@ -5,7 +5,7 @@ import { History, ImageIcon, Play, RefreshCw, RotateCcw, Share2, Trash2, Upload,
 import { toast } from 'sonner';
 import { api, errorMessage, xhrUpload } from '@/lib/api';
 import { useSession } from '@/lib/session';
-import type { FileDTO, ShareDTO } from '@/lib/types';
+import type { FileDTO, FolderDTO, ShareDTO } from '@/lib/types';
 import { cn, formatBytes, formatDate, timeAgo } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { Checkbox, Field, Input, NativeSelect, Textarea } from '../ui/form';
@@ -139,8 +139,11 @@ export function VersionsSection({ file, onChanged }: { file: FileDTO; onChanged:
 
 // ─── Share links ─────────────────────────────────────────────────────────────
 
-export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open: boolean; onOpenChange: (o: boolean) => void }) {
+/** Creates a share link for one file, or for a whole folder (its files and sub-folders). */
+export function ShareDialog({ file, folder, open, onOpenChange }: { file?: FileDTO; folder?: FolderDTO | null; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
+  const isFolder = !file && Boolean(folder);
+  const targetName = file?.name ?? folder?.name ?? '';
   const [title, setTitle] = React.useState('');
   const [message, setMessage] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -169,7 +172,14 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
-        <DialogHeader title={`Share ${file.name}`} description="Anyone with the link can open a download page — no account or API key needed. Works for private files." />
+        <DialogHeader
+          title={`Share ${targetName}`}
+          description={
+            isFolder
+              ? 'Anyone with the link can browse and download every file in this folder and its sub-folders — no account needed. New files show up automatically; role-restricted sub-folders are left out.'
+              : 'Anyone with the link can open a download page — no account or API key needed. Works for private files.'
+          }
+        />
         {created ? (
           <>
             <DialogBody>
@@ -189,14 +199,14 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
               e.preventDefault();
               setBusy(true);
               try {
-                const s = await api<ShareDTO>(`/files/${file.id}/shares`, {
+                const s = await api<ShareDTO>(isFolder ? `/folders/${folder!.id}/shares` : `/files/${file!.id}/shares`, {
                   body: {
                     title: title || null,
                     message: message || null,
                     ...(password ? { password } : {}),
                     ...(expires ? { expires_in: Number(expires) } : {}),
                     max_downloads: maxDownloads ? Number(maxDownloads) : null,
-                    one_time: oneTime,
+                    one_time: !isFolder && oneTime,
                     require_email: requireEmail,
                     allowed_countries: countries,
                     allowed_ips: ips,
@@ -204,7 +214,7 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
                 });
                 setCreated(s);
                 void qc.invalidateQueries({ queryKey: ['shares'] });
-                void qc.invalidateQueries({ queryKey: ['file-shares', file.id] });
+                if (file) void qc.invalidateQueries({ queryKey: ['file-shares', file.id] });
               } catch (err) {
                 toast.error(errorMessage(err));
               } finally {
@@ -215,7 +225,7 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
             <DialogBody>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Title (optional)">
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder={file.name} />
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder={targetName} />
                 </Field>
                 <Field label="Password (optional)">
                   <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={4} autoComplete="new-password" />
@@ -229,8 +239,8 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
                     <option value="">Never</option>
                   </NativeSelect>
                 </Field>
-                <Field label="Download limit">
-                  <Input type="number" min={1} value={oneTime ? '1' : maxDownloads} disabled={oneTime} onChange={(e) => setMaxDownloads(e.target.value)} placeholder="Unlimited" />
+                <Field label="Download limit" hint={isFolder ? 'Total file downloads across the folder.' : undefined}>
+                  <Input type="number" min={1} value={oneTime && !isFolder ? '1' : maxDownloads} disabled={oneTime && !isFolder} onChange={(e) => setMaxDownloads(e.target.value)} placeholder="Unlimited" />
                 </Field>
                 <Field label="Allowed countries" hint="ISO codes; empty = anywhere.">
                   <ListInput upper value={countries} onChange={setCountries} placeholder="AU, NZ" />
@@ -243,9 +253,11 @@ export function ShareDialog({ file, open, onOpenChange }: { file: FileDTO; open:
                 <Textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} rows={2} />
               </Field>
               <div className="flex flex-wrap gap-4 text-[13px]">
-                <label className="flex items-center gap-2">
-                  <Checkbox checked={oneTime} onCheckedChange={(c) => setOneTime(c === true)} /> Download once, then destroy the link
-                </label>
+                {!isFolder && (
+                  <label className="flex items-center gap-2">
+                    <Checkbox checked={oneTime} onCheckedChange={(c) => setOneTime(c === true)} /> Download once, then destroy the link
+                  </label>
+                )}
                 <label className="flex items-center gap-2">
                   <Checkbox checked={requireEmail} onCheckedChange={(c) => setRequireEmail(c === true)} /> Ask for an email address
                 </label>

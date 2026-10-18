@@ -197,8 +197,11 @@ export interface ZoneDTO {
 
 export interface ShareDTO {
   id: string;
-  file_id: string;
+  target: 'file' | 'folder';
+  file_id: string | null;
   file?: { id: string; name: string };
+  folder_id: string | null;
+  folder?: { id: string; name: string; path: string };
   url: string | null;
   token_prefix: string;
   title: string | null;

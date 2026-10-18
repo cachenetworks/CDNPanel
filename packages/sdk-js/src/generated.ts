@@ -292,10 +292,18 @@ export class CdnClient extends CdnCore {
   }
 
   /**
+   * Share a folder — Creates a share URL for a whole folder: the landing page lists every ready file in the folder and its sub-folders, each downloadable on its own. Sub-folders restricted to staff roles are not exposed. Same options as file shares except one-time use; the download limit counts file downloads. The URL is only returned once.
+   * `POST /api/v1/folders/{id}/shares` · scopes: shares:write
+   */
+  shareAFolder<T = any>(id: string, options: { body?: Record<string, unknown>; signal?: AbortSignal } = {}): Promise<T> {
+    return this.request<T>(`/api/v1/folders/${encodeURIComponent(id)}/shares`, { method: 'POST', signal: options.signal, body: options.body } as RequestOptions);
+  }
+
+  /**
    * List share links
    * `GET /api/v1/shares` · scopes: shares:write
    */
-  listShareLinks<T = any>(options: { query?: { "page"?: string | number | boolean; "limit"?: string | number | boolean; "file_id"?: string | number | boolean; "state"?: string | number | boolean }; signal?: AbortSignal } = {}): Promise<T> {
+  listShareLinks<T = any>(options: { query?: { "page"?: string | number | boolean; "limit"?: string | number | boolean; "file_id"?: string | number | boolean; "folder_id"?: string | number | boolean; "state"?: string | number | boolean }; signal?: AbortSignal } = {}): Promise<T> {
     return this.request<T>(`/api/v1/shares`, { method: 'GET', signal: options.signal, query: options.query } as RequestOptions);
   }
 
@@ -748,6 +756,12 @@ export const OPERATIONS = [
     "name": "createAShareLink",
     "method": "POST",
     "path": "/api/v1/files/{id}/shares",
+    "tag": "Shares"
+  },
+  {
+    "name": "shareAFolder",
+    "method": "POST",
+    "path": "/api/v1/folders/{id}/shares",
     "tag": "Shares"
   },
   {

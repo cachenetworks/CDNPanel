@@ -190,6 +190,11 @@ func (c *Client) CreateAShareLink(ctx context.Context, id string, body any) (*Re
 	return c.do(ctx, "POST", fmt.Sprintf("/api/v1/files/%s/shares", url.PathEscape(id)), nil, body, nil, nil)
 }
 
+// ShareAFolder: Share a folder (POST /api/v1/folders/{id}/shares).
+func (c *Client) ShareAFolder(ctx context.Context, id string, body any) (*Response, error) {
+	return c.do(ctx, "POST", fmt.Sprintf("/api/v1/folders/%s/shares", url.PathEscape(id)), nil, body, nil, nil)
+}
+
 // ListShareLinks: List share links (GET /api/v1/shares).
 func (c *Client) ListShareLinks(ctx context.Context, query url.Values) (*Response, error) {
 	return c.do(ctx, "GET", "/api/v1/shares", query, nil, nil, nil)

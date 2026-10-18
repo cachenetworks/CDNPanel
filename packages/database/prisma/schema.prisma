@@ -372,6 +372,7 @@ model Folder {
   children  Folder[] @relation("FolderTree")
   files     File[]
   zone      Zone?
+  shares    ShareLink[]
   createdBy User?    @relation("FolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([parentId, slug])
@@ -899,7 +900,9 @@ model MediaRendition {
 
 model ShareLink {
   id                String        @id
-  fileId            String
+  /// Exactly one of fileId / folderId is set: a share targets one file or a whole folder subtree.
+  fileId            String?
+  folderId          String?
   /// SHA-256 of the URL token; the raw token only exists in the link.
   tokenHash         String        @unique
   tokenPrefix       String
@@ -921,10 +924,12 @@ model ShareLink {
   createdByApiKeyId String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  file              File          @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  file              File?         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  folder            Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
   accesses          ShareAccess[]
 
   @@index([fileId])
+  @@index([folderId])
 }
 
 model ShareAccess {

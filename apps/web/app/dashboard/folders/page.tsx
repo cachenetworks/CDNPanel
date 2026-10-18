@@ -2,7 +2,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderPlus, FolderTree, MoreHorizontal, Pencil, Trash2, FolderInput, Plus } from 'lucide-react';
+import { FolderInput, FolderPlus, FolderTree, MoreHorizontal, Pencil, Plus, Share2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage, type Paginated } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -16,6 +16,7 @@ import { FolderIcon } from '@/components/files/file-icon';
 import { VisibilityBadge } from '@/components/files/file-details';
 import { FolderDialog } from '@/components/files/folder-dialog';
 import { FolderPickerDialog } from '@/components/files/folder-picker';
+import { ShareDialog } from '@/components/files/file-extras';
 import { useConfirm } from '@/components/confirm';
 
 export default function FoldersPage() {
@@ -25,6 +26,7 @@ export default function FoldersPage() {
   const [filter, setFilter] = React.useState('');
   const [dialog, setDialog] = React.useState<{ open: boolean; folder?: FolderDTO | null; parentId?: string | null }>({ open: false });
   const [moving, setMoving] = React.useState<FolderDTO | null>(null);
+  const [sharing, setSharing] = React.useState<FolderDTO | null>(null);
   const q = useQuery({ queryKey: ['folders', 'all'], queryFn: () => api<Paginated<FolderDTO>>('/folders', { query: { all: 'true', limit: 500 } }) });
   const rows = (q.data?.data ?? []).filter((f) => !filter || f.path.toLowerCase().includes(filter.toLowerCase()) || f.name.toLowerCase().includes(filter.toLowerCase()));
 
@@ -95,6 +97,11 @@ export default function FoldersPage() {
                             <Plus /> New sub-folder
                           </DropdownMenuItem>
                         )}
+                        {can('shares.manage') && (
+                          <DropdownMenuItem onSelect={() => setSharing(f)}>
+                            <Share2 /> Share
+                          </DropdownMenuItem>
+                        )}
                         {can('folders.edit') && (
                           <DropdownMenuItem onSelect={() => setDialog({ open: true, folder: f })}>
                             <Pencil /> Rename & settings
@@ -140,6 +147,7 @@ export default function FoldersPage() {
           </Table>
         )}
       </Panel>
+      <ShareDialog folder={sharing} open={Boolean(sharing)} onOpenChange={(o) => !o && setSharing(null)} />
       <FolderDialog open={dialog.open} onOpenChange={(o) => setDialog((s) => ({ ...s, open: o }))} folder={dialog.folder} parentId={dialog.parentId} />
       <FolderPickerDialog
         open={Boolean(moving)}

@@ -252,6 +252,43 @@ describe('share links', () => {
     expect((await app.inject({ url: `${path}/download` })).statusCode).toBe(200);
     expect((await app.inject({ url: `${path}/download` })).statusCode).toBe(404);
   });
+
+  it('shares a whole folder, including sub-folders but not role-restricted ones', async () => {
+    const prisma = getPrisma();
+    const mk = (name: string, parent: { id: string; path: string } | null, restricted: string[] = []) =>
+      prisma.folder.create({ data: { id: newId('folder'), name, slug: name, parentId: parent?.id ?? null, path: `${parent?.path ?? ''}/${name}`, restrictedToRoleIds: restricted } });
+    const root = await mk('shared-docs', null);
+    const sub = await mk('nested', root);
+    const hidden = await mk('hidden', root, ['role_nobody']);
+    const top = (await upload('readme.txt', Buffer.from('top'))).json();
+    const deep = (await upload('deep.txt', Buffer.from('deep'))).json();
+    const secret = (await upload('secret-sub.txt', Buffer.from('nope'))).json();
+    await prisma.file.update({ where: { id: top.id }, data: { folderId: root.id } });
+    await prisma.file.update({ where: { id: deep.id }, data: { folderId: sub.id } });
+    await prisma.file.update({ where: { id: secret.id }, data: { folderId: hidden.id } });
+
+    expect((await app.inject({ method: 'POST', url: `/api/v1/folders/${root.id}/shares`, headers: bearer(), payload: { one_time: true } })).statusCode).toBe(422);
+    const share = await app.inject({ method: 'POST', url: `/api/v1/folders/${root.id}/shares`, headers: bearer(), payload: { max_downloads: 2 } });
+    expect(share.statusCode, share.body).toBe(201);
+    expect(share.json()).toMatchObject({ target: 'folder', folder_id: root.id, file_id: null });
+    const path = new URL(share.json().url).pathname;
+
+    const page = await app.inject({ url: path });
+    expect(page.statusCode).toBe(200);
+    expect(page.body).toContain('readme.txt');
+    expect(page.body).toContain('nested/deep.txt');
+    expect(page.body).not.toContain('secret-sub.txt');
+
+    expect((await app.inject({ url: `${path}/files/${deep.id}` })).body).toBe('deep');
+    expect((await app.inject({ url: `${path}/files/${secret.id}` })).statusCode).toBe(404);
+    expect((await app.inject({ url: `${path}/files/${otherFile.id}` })).statusCode).toBe(404);
+    expect((await app.inject({ url: `${path}/download` })).statusCode).toBe(404);
+    expect((await app.inject({ url: `${path}/files/${top.id}` })).body).toBe('top');
+    expect((await app.inject({ url: `${path}/files/${top.id}` })).json().error.code).toBe('share_expired');
+
+    const listed = await app.inject({ url: `/api/v1/shares?folder_id=${root.id}`, headers: bearer() });
+    expect(listed.json().data[0]).toMatchObject({ id: share.json().id, download_count: 2, folder: { path: '/shared-docs' } });
+  });
 });
 
 describe('edge security', () => {

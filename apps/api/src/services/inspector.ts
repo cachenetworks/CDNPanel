@@ -123,11 +123,15 @@ export async function inspectUrl(opts: InspectOptions): Promise<{ url: string; v
   } else if (route.kind === 'zone_path') {
     file = await fileByPath(hostZone!.rootFolder?.path ?? '', route.segments!);
   } else if (route.kind === 'share') {
-    share = /^[0-9A-Za-z]{16,64}$/.test(route.shareToken!) ? await getPrisma().shareLink.findUnique({ where: { tokenHash: sha256Hex(route.shareToken!) }, include: { file: true } }) : null;
+    share = /^[0-9A-Za-z]{16,64}$/.test(route.shareToken!) ? await getPrisma().shareLink.findUnique({ where: { tokenHash: sha256Hex(route.shareToken!) }, include: { file: true, folder: true } }) : null;
     if (share) {
       file = share.file;
       const state = shareState(share);
       steps.push({ stage: 'share', status: state === 'active' ? 'ok' : 'fail', title: `Share link is ${state}`, data: { password: Boolean(share.passwordHash), require_email: share.requireEmail, downloads: share.downloadCount, max_downloads: share.maxDownloads, expires_at: share.expiresAt?.toISOString() ?? null, one_time: share.oneTime } });
+      if (share.folder) {
+        steps.push({ stage: 'file', status: 'info', title: `Folder share of ${share.folder.path}`, detail: 'The landing page lists the folder’s files; each is downloaded through /s/<token>/files/<file id>.' });
+        return { url: opts.url, verdict: state === 'active' ? 'served' : 'not_found', steps, headers };
+      }
     } else steps.push({ stage: 'share', status: 'fail', title: 'Share token not found' });
   }
   if (!file) {

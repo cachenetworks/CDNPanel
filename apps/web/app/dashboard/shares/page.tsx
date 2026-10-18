@@ -1,7 +1,7 @@
 'use client';
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ban, Share2 } from 'lucide-react';
+import { Ban, Folder, Share2 } from 'lucide-react';
 import { api, type Paginated } from '@/lib/api';
 import type { ShareDTO } from '@/lib/types';
 import { formatDate, timeAgo } from '@/lib/utils';
@@ -17,6 +17,8 @@ const STATE_TONE = { active: 'success', expired: 'warning', exhausted: 'neutral'
 interface ShareDetail extends ShareDTO {
   accesses: { timestamp: string; email: string | null; ip: string | null; country: string | null; user_agent: string | null; downloaded: boolean }[];
 }
+
+const targetName = (s: ShareDTO) => s.folder?.path ?? s.file?.name ?? s.folder_id ?? s.file_id ?? '';
 
 function shareLimits(s: ShareDTO): string {
   const parts = [];
@@ -56,7 +58,7 @@ export default function SharesPage() {
     <>
       <PageHeader
         title="Share Links"
-        description="Human-friendly links to private files with optional passwords, expiry, download limits, one-time use, IP / country restrictions and email capture. Create them from a file’s details panel."
+        description="Human-friendly links to private files or whole folders with optional passwords, expiry, download limits, one-time use, IP / country restrictions and email capture. Create them from a file’s details panel or a folder’s menu."
         actions={
           <NativeSelect value={state} onChange={(e) => setState(e.target.value as typeof state)} aria-label="Filter">
             <option value="active">Active</option>
@@ -70,12 +72,12 @@ export default function SharesPage() {
         {!q.data ? (
           <Skeleton className="m-3 h-40" />
         ) : q.data.data.length === 0 ? (
-          <EmptyState icon={Share2} title="No share links" description="Open a file and choose “Share” to create one." />
+          <EmptyState icon={Share2} title="No share links" description="Open a file or a folder’s menu and choose “Share” to create one." />
         ) : (
           <Table>
             <THead>
               <tr>
-                <TH>File</TH>
+                <TH>Shared</TH>
                 <TH>Link</TH>
                 <TH>State</TH>
                 <TH>Protection</TH>
@@ -88,8 +90,11 @@ export default function SharesPage() {
               {q.data.data.map((s) => (
                 <TR key={s.id} className="cursor-pointer" onClick={() => setViewing(s.id)}>
                   <TD>
-                    <div className="font-medium">{s.title ?? s.file?.name}</div>
-                    {s.title && <div className="text-xs text-muted-foreground">{s.file?.name}</div>}
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {s.target === 'folder' && <Folder className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Folder" />}
+                      {s.title ?? targetName(s)}
+                    </div>
+                    {s.title && <div className="text-xs text-muted-foreground">{targetName(s)}</div>}
                   </TD>
                   <TD className="font-mono text-xs text-muted-foreground">/s/{s.token_prefix}…</TD>
                   <TD>
@@ -115,7 +120,7 @@ export default function SharesPage() {
 
       <Dialog open={Boolean(viewing)} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent size="lg">
-          <DialogHeader title={detail.data?.title ?? detail.data?.file?.name ?? 'Share link'} description="The full link (with its secret token) is only shown when it is created." />
+          <DialogHeader title={detail.data?.title ?? (detail.data ? targetName(detail.data) : 'Share link')} description="The full link (with its secret token) is only shown when it is created." />
           <DialogBody>
             {!detail.data ? (
               <Skeleton className="h-40" />
@@ -124,7 +129,7 @@ export default function SharesPage() {
                 <KeyValue
                   items={[
                     ['State', <Badge key="s" tone={STATE_TONE[detail.data.state]}>{detail.data.state}</Badge>],
-                    ['File', detail.data.file?.name ?? detail.data.file_id],
+                    [detail.data.target === 'folder' ? 'Folder' : 'File', targetName(detail.data)],
                     ['Protection', shareLimits(detail.data)],
                     ['Downloads', String(detail.data.download_count)],
                     ['Expires', detail.data.expires_at ? formatDate(detail.data.expires_at) : 'Never'],

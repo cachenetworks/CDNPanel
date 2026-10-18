@@ -157,6 +157,10 @@ class CdnClient(CdnCore):
         """Create a share link (POST /api/v1/files/{id}/shares)."""
         return self._request("POST", f"/api/v1/files/{_q(id)}/shares", body=body)
 
+    def share_a_folder(self, id: str, body: Optional[Dict[str, Any]] = None) -> Any:
+        """Share a folder (POST /api/v1/folders/{id}/shares)."""
+        return self._request("POST", f"/api/v1/folders/{_q(id)}/shares", body=body)
+
     def list_share_links(self, query: Optional[Dict[str, Any]] = None) -> Any:
         """List share links (GET /api/v1/shares)."""
         return self._request("GET", f"/api/v1/shares", query=query)

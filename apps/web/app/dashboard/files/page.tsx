@@ -3,7 +3,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Files as FilesIcon, FolderPlus, Grid2x2, List, MoreHorizontal, Pencil, Search, Trash2, Upload, FolderInput, Link2, Copy } from 'lucide-react';
+import { ChevronRight, Files as FilesIcon, FolderPlus, Grid2x2, List, MoreHorizontal, Pencil, Search, Share2, Trash2, Upload, FolderInput, Link2, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage, type Paginated } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -18,6 +18,7 @@ import { FileIcon, FolderIcon } from '@/components/files/file-icon';
 import { FileDetails, VisibilityBadge, statusTone } from '@/components/files/file-details';
 import { FolderDialog } from '@/components/files/folder-dialog';
 import { FolderPickerDialog } from '@/components/files/folder-picker';
+import { ShareDialog } from '@/components/files/file-extras';
 import { StorageMoveDialog } from '@/components/files/storage-move-dialog';
 import { useConfirm } from '@/components/confirm';
 import { useUploads } from '@/components/uploads/upload-manager';
@@ -64,6 +65,7 @@ function FilesBrowser() {
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [folderDialog, setFolderDialog] = React.useState<{ open: boolean; folder?: FolderDTO | null }>({ open: false });
   const [moveFolder, setMoveFolder] = React.useState<FolderDTO | null>(null);
+  const [shareFolder, setShareFolder] = React.useState<FolderDTO | null>(null);
   const [bulkMove, setBulkMove] = React.useState(false);
   const [storageMoveOpen, setStorageMoveOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
@@ -190,6 +192,11 @@ function FilesBrowser() {
       </DropdownMenuTrigger>
       <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onSelect={() => goFolder(folder.id)}>Open</DropdownMenuItem>
+        {can('shares.manage') && (
+          <DropdownMenuItem onSelect={() => setShareFolder(folder)}>
+            <Share2 /> Share
+          </DropdownMenuItem>
+        )}
         {can('folders.edit') && (
           <DropdownMenuItem onSelect={() => setFolderDialog({ open: true, folder })}>
             <Pencil /> Rename & settings
@@ -529,6 +536,7 @@ function FilesBrowser() {
 
       <FileDetails fileId={openFile} onClose={() => setFileParam(null)} />
       <StorageMoveDialog open={storageMoveOpen} onOpenChange={setStorageMoveOpen} fileIds={[...selected]} />
+      <ShareDialog folder={shareFolder} open={Boolean(shareFolder)} onOpenChange={(o) => !o && setShareFolder(null)} />
       <FolderDialog open={folderDialog.open} onOpenChange={(o) => setFolderDialog((s) => ({ ...s, open: o }))} folder={folderDialog.folder} parentId={folderId} />
       <FolderPickerDialog
         open={Boolean(moveFolder)}
