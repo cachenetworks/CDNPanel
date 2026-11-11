@@ -10,6 +10,8 @@ export interface UploadOptions {
   expiresInDays?: number;
   /** Files larger than this use the resumable chunked upload API (default 64 MB). */
   chunkThreshold?: number;
+  /** Chunks sent at the same time for chunked uploads (default 4). */
+  chunkConcurrency?: number;
   onProgress?: (uploaded: number, total: number) => void;
   signal?: AbortSignal;
 }
@@ -40,12 +42,16 @@ export class CdnClient extends GeneratedClient {
       signal: opts.signal,
     });
     let uploaded = 0;
-    for (let i = 0; i < session.total_chunks; i++) {
-      const chunk = data.slice(i * session.chunk_size, Math.min(data.size, (i + 1) * session.chunk_size));
-      await this.uploadAChunk(session.id, { query: { index: i }, data: chunk, signal: opts.signal });
-      uploaded += chunk.size;
-      opts.onProgress?.(uploaded, data.size);
-    }
+    const queue = Array.from({ length: session.total_chunks as number }, (_, i) => i);
+    const workers = Array.from({ length: Math.max(1, Math.min(opts.chunkConcurrency ?? 4, queue.length)) }, async () => {
+      for (let i = queue.shift(); i !== undefined; i = queue.shift()) {
+        const chunk = data.slice(i * session.chunk_size, Math.min(data.size, (i + 1) * session.chunk_size));
+        await this.uploadAChunk(session.id, { query: { index: i }, data: chunk, signal: opts.signal });
+        uploaded += chunk.size;
+        opts.onProgress?.(uploaded, data.size);
+      }
+    });
+    await Promise.all(workers);
     const file = await this.completeAChunkedUpload(session.id, { signal: opts.signal });
     if (opts.cacheTags?.length || opts.expiresInDays) {
       return this.updateAFile(file.id, {

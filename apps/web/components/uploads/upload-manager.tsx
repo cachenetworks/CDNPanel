@@ -13,6 +13,8 @@ import type { FileDTO, Visibility } from '@/lib/types';
 const DIRECT_LIMIT = 64 * 1024 * 1024;
 const CONCURRENCY = 3;
 const CHUNK_RETRIES = 3;
+/** Chunks of one file uploaded at the same time. */
+const CHUNK_PARALLEL = 4;
 
 export type UploadStatus = 'queued' | 'uploading' | 'processing' | 'complete' | 'failed' | 'cancelled';
 
@@ -62,32 +64,55 @@ async function uploadChunked(item: UploadItem, onProgress: (loaded: number) => v
     signal,
   });
   const done = new Set(init.received_chunks);
-  let confirmed = 0;
-  for (let i = 0; i < init.total_chunks; i++) {
-    if (done.has(i)) {
-      confirmed += Math.min(init.chunk_size, item.file.size - i * init.chunk_size);
-      continue;
-    }
-    const blob = item.file.slice(i * init.chunk_size, Math.min(item.file.size, (i + 1) * init.chunk_size));
-    let attempt = 0;
-    for (;;) {
+  const sizeOf = (i: number) => Math.min(init.chunk_size, item.file.size - i * init.chunk_size);
+  let confirmed = [...done].reduce((n, i) => n + sizeOf(i), 0);
+  const inFlight = new Map<number, number>();
+  const report = () => onProgress(confirmed + [...inFlight.values()].reduce((a, b) => a + b, 0));
+  const pending = Array.from({ length: init.total_chunks }, (_, i) => i).filter((i) => !done.has(i));
+  // One failing chunk stops the others instead of letting them keep uploading.
+  const local = new AbortController();
+  const abort = () => local.abort();
+  signal.addEventListener('abort', abort);
+
+  const sendChunk = async (i: number) => {
+    const blob = item.file.slice(i * init.chunk_size, i * init.chunk_size + sizeOf(i));
+    for (let attempt = 1; ; attempt++) {
       try {
         await xhrUpload(`/api/v1/uploads/${init.id}/chunk?index=${i}`, blob, {
           headers: { 'Content-Type': 'application/octet-stream' },
-          onProgress: (l) => onProgress(confirmed + l),
-          signal,
+          onProgress: (l) => {
+            inFlight.set(i, l);
+            report();
+          },
+          signal: local.signal,
         });
         break;
       } catch (err) {
-        if (signal.aborted || (err instanceof ApiError && err.status >= 400 && err.status < 500) || ++attempt >= CHUNK_RETRIES) {
-          if (signal.aborted) await api(`/uploads/${init.id}`, { method: 'DELETE' }).catch(() => undefined);
-          throw err;
-        }
+        inFlight.delete(i);
+        if (local.signal.aborted || (err instanceof ApiError && err.status >= 400 && err.status < 500) || attempt >= CHUNK_RETRIES) throw err;
         await new Promise((r) => setTimeout(r, 1000 * attempt));
       }
     }
+    inFlight.delete(i);
     confirmed += blob.size;
-    onProgress(confirmed);
+    report();
+  };
+
+  try {
+    // Several chunks in flight: a single connection (especially through a tunnel) rarely fills the uplink.
+    await Promise.all(
+      Array.from({ length: Math.min(CHUNK_PARALLEL, pending.length) }, async () => {
+        for (let i = pending.shift(); i !== undefined; i = pending.shift()) await sendChunk(i);
+      }),
+    ).catch((err) => {
+      local.abort();
+      throw err;
+    });
+  } catch (err) {
+    if (signal.aborted) await api(`/uploads/${init.id}`, { method: 'DELETE' }).catch(() => undefined);
+    throw err;
+  } finally {
+    signal.removeEventListener('abort', abort);
   }
   onProcessing();
   return api<FileDTO>(`/uploads/${init.id}/complete`, { method: 'POST', signal });
