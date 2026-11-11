@@ -28,7 +28,7 @@ function rp() {
   return { rpID: url.hostname, origin: url.origin };
 }
 
-const responseJson = z.object({ id: z.string().max(1024), rawId: z.string().max(1024), type: z.literal('public-key'), response: z.record(z.unknown()), clientExtensionResults: z.record(z.unknown()).default({}), authenticatorAttachment: z.string().optional() }).passthrough();
+const responseJson = z.object({ id: z.string().max(1024), rawId: z.string().max(1024), type: z.literal('public-key'), response: z.record(z.string(), z.unknown()), clientExtensionResults: z.record(z.string(), z.unknown()).default({}), authenticatorAttachment: z.string().optional() }).passthrough();
 
 function serializePasskey(p: { id: string; name: string; deviceType: string | null; backedUp: boolean; transports: string[]; lastUsedAt: Date | null; createdAt: Date }) {
   return { id: p.id, name: p.name, device_type: p.deviceType, backed_up: p.backedUp, transports: p.transports, last_used_at: p.lastUsedAt?.toISOString() ?? null, created_at: p.createdAt.toISOString() };

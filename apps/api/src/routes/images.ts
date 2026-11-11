@@ -98,7 +98,7 @@ export const imageRoutes: RouteDef<any, any, any>[] = [
     auth: 'any',
     permission: 'files.view',
     scope: 'files:read',
-    body: z.object({ file_id: z.string(), params: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}) }),
+    body: z.object({ file_id: z.string(), params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}) }),
     responses: { 200: { description: 'Signed URL', example: { url: 'https://cdn.example.com/img/file_…?format=webp&q=80&w=800&s=1.Xy…', canonical: 'w=800&format=webp&q=80' } } },
     errors: ['file_not_found', 'transform_invalid', 'transform_unsupported'],
     async handler({ req, body }) {

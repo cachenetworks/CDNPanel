@@ -42,6 +42,14 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      # The runner's default client tools are newer than the Postgres 16 service; a newer
+      # pg_dump writes settings (e.g. transaction_timeout) that 16 cannot restore.
+      - name: Postgres 16 client tools
+        run: |
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
       - name: Backup / restore round trip
         run: ./scripts/test-backup-restore.sh
         env:

@@ -1,4 +1,3 @@
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { z, type ZodTypeAny } from 'zod';
 import { API_SCOPES, ERROR_CATALOG, PERMISSIONS, type ErrorCode } from '@cdn/shared';
 import { env } from '../config/env.js';
@@ -8,7 +7,16 @@ import { ALL_ROUTES } from '../routes/index.js';
 type JsonSchema = Record<string, unknown>;
 
 function toSchema(schema: ZodTypeAny): JsonSchema {
-  const out = zodToJsonSchema(schema, { target: 'openApi3', $refStrategy: 'none' }) as JsonSchema;
+  const out = z.toJSONSchema(schema, {
+    target: 'openapi-3.0',
+    // Document what clients send (before defaults / transforms run).
+    io: 'input',
+    unrepresentable: 'any',
+    override: (ctx) => {
+      // Dates arrive as ISO 8601 strings (z.coerce.date()).
+      if (ctx.zodSchema._zod.def.type === 'date') Object.assign(ctx.jsonSchema, { type: 'string', format: 'date-time' });
+    },
+  }) as JsonSchema;
   delete out.$schema;
   return out;
 }
@@ -17,8 +25,9 @@ function unwrapObject(schema: ZodTypeAny | undefined): z.ZodObject<z.ZodRawShape
   let s: ZodTypeAny | undefined = schema;
   while (s) {
     if (s instanceof z.ZodObject) return s;
-    if (s instanceof z.ZodEffects) s = s.innerType();
-    else if (s instanceof z.ZodDefault || s instanceof z.ZodOptional) s = s._def.innerType;
+    // .transform() / .pipe() wrap the input schema; .default() / .optional() wrap the inner type.
+    if (s instanceof z.ZodPipe) s = s._zod.def.in as ZodTypeAny;
+    else if (s instanceof z.ZodDefault || s instanceof z.ZodOptional) s = s._zod.def.innerType as ZodTypeAny;
     else return null;
   }
   return null;

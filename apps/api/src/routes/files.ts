@@ -247,7 +247,7 @@ export const fileRoutes: RouteDef<any, any, any>[] = [
         visibility: z.enum(['PUBLIC', 'PRIVATE', 'AUTHENTICATED', 'SIGNED_URL_ONLY']).optional(),
         cache_control: z.string().max(200).regex(/^[\w\s,=-]+$/).nullable().optional(),
         force_download: z.boolean().optional(),
-        metadata: z.record(z.unknown()).optional(),
+        metadata: z.record(z.string(), z.unknown()).optional(),
         cache_tags: z.array(z.string().max(100)).max(32).optional(),
         expires_at: z.coerce.date().nullable().optional(),
       })

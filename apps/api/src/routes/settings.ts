@@ -55,7 +55,7 @@ export const settingsRoutes: RouteDef<any, any, any>[] = [
     auth: 'session',
     permission: 'settings.edit',
     params: sectionParam,
-    body: z.record(z.unknown()),
+    body: z.record(z.string(), z.unknown()),
     responses: { 200: { description: 'Updated section' } },
     errors: ['validation_failed', 'reauthentication_required'],
     async handler({ req, params, body, auth }) {
